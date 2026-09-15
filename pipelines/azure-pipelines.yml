@@ -1,0 +1,167 @@
+# Helios delivery pipeline
+#
+# One commit walks itself from build through dev and test into production,
+# stopping at exactly one human approval and reversing itself if the
+# post-deploy smoke test fails.
+#
+# This pipeline lives in the platform repo and builds the application repo.
+# That is the shape it takes in practice: the team that owns delivery does not
+# necessarily own the service being delivered.
+#
+# Before it can run, in Azure DevOps:
+#   - a GitHub service connection named 'github-anwexhaa'
+#   - an Azure Resource Manager service connection using workload identity
+#     federation, not a client secret
+#   - Environments named helios-dev, helios-test, helios-prod, with a manual
+#     approval check on helios-prod only
+#   - a variable group 'helios' holding acrLoginServer, acrName,
+#     resourceGroup, clusterName, azureServiceConnection
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - docs/*
+      - runbooks/*
+      - "**/*.md"
+
+pr:
+  branches:
+    include:
+      - main
+
+resources:
+  repositories:
+    - repository: orion
+      type: github
+      name: anwexhaa/orion-queue
+      ref: refs/heads/main
+      endpoint: github-anwexhaa
+
+variables:
+  - group: helios
+  - name: imageName
+    value: orion-queue
+  - name: imageTag
+    # The git SHA of the application repo, so a running pod can always be
+    # traced back to the exact source that produced it.
+    value: $(Build.SourceVersion)
+  - name: vmImage
+    value: ubuntu-latest
+
+stages:
+  # ---------------------------------------------------------------------
+  - stage: verify
+    displayName: Build and verify
+    jobs:
+      - job: build
+        displayName: Test, scan, publish
+        pool:
+          vmImage: $(vmImage)
+        services:
+          # The test suite needs a real Redis. It is exercising Redis
+          # semantics — sorted set ordering, atomic pops — so faking it would
+          # test the fake.
+          redis: redis
+        steps:
+          - checkout: self
+          - checkout: orion
+
+          - task: UsePythonVersion@0
+            displayName: Python 3.12
+            inputs:
+              versionSpec: "3.12"
+
+          - script: |
+              set -euo pipefail
+              cd orion-queue
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt pytest
+            displayName: Install dependencies
+
+          - script: |
+              set -euo pipefail
+              cd orion-queue
+              python -m pytest -q --junitxml=$(Build.ArtifactStagingDirectory)/tests.xml
+            displayName: Unit tests
+            env:
+              REDIS_HOST: redis
+              REDIS_PORT: "6379"
+
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFiles: $(Build.ArtifactStagingDirectory)/tests.xml
+              testRunTitle: orion-queue unit tests
+
+          - task: AzureCLI@2
+            displayName: Build and push image
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                cd orion-queue
+                # az acr build runs the build inside ACR, so the agent never
+                # needs registry credentials of its own.
+                az acr build \
+                  --registry "$(acrName)" \
+                  --image "$(imageName):$(imageTag)" \
+                  --file Dockerfile .
+
+          - task: AzureCLI@2
+            displayName: Vulnerability scan (merge gate)
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az acr login --name "$(acrName)"
+                # --ignore-unfixed: a finding with no available patch is not
+                # something this build can act on, and failing on it trains
+                # people to ignore the gate.
+                docker run --rm \
+                  -v /var/run/docker.sock:/var/run/docker.sock \
+                  aquasec/trivy:latest image \
+                    --exit-code 1 \
+                    --severity HIGH,CRITICAL \
+                    --ignore-unfixed \
+                    "$(acrLoginServer)/$(imageName):$(imageTag)"
+
+  # ---------------------------------------------------------------------
+  - template: templates/deploy-stage.yml
+    parameters:
+      stageName: deploy_dev
+      displayName: Deploy to dev
+      environment: helios-dev
+      namespace: helios-dev
+      overlay: dev
+      dependsOn: [verify]
+
+  - template: templates/deploy-stage.yml
+    parameters:
+      stageName: deploy_test
+      displayName: Deploy to test
+      environment: helios-test
+      namespace: helios-test
+      overlay: test
+      dependsOn: [deploy_dev]
+
+  # The approval check lives on the helios-prod Environment in Azure DevOps,
+  # not in this file. Approvals belong to the environment, so they cannot be
+  # removed by editing the pipeline.
+  - template: templates/deploy-stage.yml
+    parameters:
+      stageName: deploy_prod
+      displayName: Deploy to production
+      environment: helios-prod
+      namespace: helios-prod
+      overlay: prod
+      dependsOn: [deploy_test]

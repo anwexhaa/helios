@@ -15,7 +15,7 @@ The platform is the project.
 |-------|-------|--------|
 | 0 | Ground work — accounts, toolchain, repo scaffold | Done |
 | 1 | Cluster and infrastructure as code | Terraform and manifests written, not yet applied |
-| 2 | Multi-environment delivery pipeline | Not started |
+| 2 | Multi-environment delivery pipeline | Pipeline and smoke test written; never run |
 | 3 | Observability, SLOs and alerting | Not started |
 | 4 | Autoscaling, chaos and incident response | Not started |
 

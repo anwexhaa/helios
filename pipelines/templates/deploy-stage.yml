@@ -1,0 +1,97 @@
+# Reusable deployment stage.
+#
+# Every environment goes through exactly the same steps. If dev and prod
+# deploy differently, dev proves nothing — so the difference between them is
+# one parameter and one kustomize overlay, never a different set of steps.
+
+parameters:
+  - name: stageName
+    type: string
+  - name: displayName
+    type: string
+  - name: environment      # Azure DevOps Environment; approval gates hang off this
+    type: string
+  - name: namespace
+    type: string
+  - name: overlay
+    type: string
+  - name: dependsOn
+    type: object
+    default: []
+
+stages:
+  - stage: ${{ parameters.stageName }}
+    displayName: ${{ parameters.displayName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: succeeded()
+    jobs:
+      - deployment: rollout
+        displayName: Deploy to ${{ parameters.namespace }}
+        environment: ${{ parameters.environment }}
+        pool:
+          vmImage: $(vmImage)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: AzureCLI@2
+                  displayName: Get cluster credentials
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      az aks get-credentials \
+                        --resource-group "$(resourceGroup)" \
+                        --name "$(clusterName)" \
+                        --overwrite-existing
+
+                - script: |
+                    set -euo pipefail
+                    cd k8s/overlays/${{ parameters.overlay }}
+                    # Pin the exact image this run built. Never 'latest' —
+                    # you cannot tell what is running from a floating tag.
+                    kustomize edit set image \
+                      orion-queue=$(acrLoginServer)/$(imageName):$(imageTag)
+                    cd -
+                    kubectl apply -k k8s/overlays/${{ parameters.overlay }}
+                  displayName: Apply manifests
+
+                - script: |
+                    set -euo pipefail
+                    for d in orion-api orion-worker orion-scheduler redis; do
+                      kubectl -n ${{ parameters.namespace }} rollout status \
+                        "deploy/$d" --timeout=180s
+                    done
+                  displayName: Wait for rollout
+
+                - script: |
+                    set -uo pipefail
+                    # Port-forward rather than exposing a LoadBalancer per
+                    # environment. One fewer public IP, one fewer thing to bill.
+                    kubectl -n ${{ parameters.namespace }} port-forward \
+                      svc/orion-api 18080:80 >/dev/null 2>&1 &
+                    pf=$!
+                    trap 'kill $pf 2>/dev/null || true' EXIT
+                    sleep 5
+
+                    chmod +x scripts/smoke.sh
+                    ./scripts/smoke.sh http://localhost:18080
+                  displayName: Smoke test
+                  name: smoke
+
+                - script: |
+                    set -uo pipefail
+                    echo "Smoke test failed. Rolling back ${{ parameters.namespace }}."
+                    for d in orion-api orion-worker orion-scheduler; do
+                      kubectl -n ${{ parameters.namespace }} rollout undo "deploy/$d" || true
+                      kubectl -n ${{ parameters.namespace }} rollout status \
+                        "deploy/$d" --timeout=120s || true
+                    done
+                    echo "Rolled back to the previous revision."
+                    exit 1
+                  displayName: Roll back on failed smoke test
+                  condition: failed()
