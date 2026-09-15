@@ -1,0 +1,56 @@
+# --- Terraform ---
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!example.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+tfplan
+*.tfplan
+
+# --- Credentials. Nothing here is ever committed. ---
+*.pem
+*.key
+*.pfx
+*.publishsettings
+kubeconfig
+kubeconfig.*
+.azure/
+azure.auth
+.env
+.env.*
+!.env.example
+
+# --- Kubernetes ---
+# Rendered output only; the templates themselves are tracked.
+k8s/**/rendered/
+charts/*.tgz
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Tooling and editors ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Load test output ---
+scripts/loadtest/results/
+*.jtl
