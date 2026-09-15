@@ -71,3 +71,45 @@ delay.
 
 **Consequence.** KEDA becomes a cluster dependency, and the Redis connection it uses needs its
 own credentials and network path.
+
+---
+
+## D6 — The KEDA `redis` scaler cannot be used
+
+**Decision.** Worker autoscaling uses KEDA's `metrics-api` scaler, moving to the `prometheus`
+scaler once Phase 3 is in place. The `redis` scaler is not an option.
+
+**Why.** `priority_queue.py` stores jobs in a Redis sorted set — `zadd`, `zpopmax`, `zcard` on
+the key `task_queue`, scored by priority. KEDA's `redis` scaler measures list length with
+`LLEN`, which returns zero against a sorted set. It would never scale, and it would never error
+either, which is worse.
+
+Converting the queue to a list would fix the scaler and destroy the priority ordering that is
+the substance of the service. The scaler changes, not the queue.
+
+**Consequence.** Worker autoscaling depends on the service exposing queue depth over HTTP.
+Until then, KEDA has nothing to read. See [F6 in the production readiness review](production-readiness-review.md).
+
+**Supersedes.** The original plan specified `type: redis` with `listName`. That configuration is
+wrong for this service.
+
+---
+
+## D7 — One autoscaling node pool, not a system and user pool split
+
+**Decision.** The cluster runs a single node pool, autoscaling from 1 to 3 nodes, rather than a
+fixed system pool plus a separate autoscaling user pool.
+
+**Why.** Two pools means at least two nodes running at all times. On Standard_B2s that roughly
+doubles the daily cost, for a cluster with one workload on it and no noisy-neighbour problem to
+solve. The cluster autoscaler behaviour that Phase 4 needs to demonstrate works identically with
+one pool.
+
+**Trade-off.** In production, isolating system pods from application pods is correct — a
+workload that exhausts a node should not take CoreDNS or the metrics server with it. That
+separation is deliberately traded away here for cost, which is the honest reason, and the right
+answer to give if asked about it in an interview.
+
+**Consequence.** Application pods and system pods are scheduled together. If a chaos experiment
+in Phase 4 destabilises the node, expect cluster components to wobble too. Note it in the game
+day record rather than treating it as a surprise.
