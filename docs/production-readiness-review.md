@@ -21,7 +21,8 @@ found; the resolution is recorded at the end of each.
 | F4 | No `/health` endpoint | Blocker | Probes, Phase 2 smoke test | Fixed |
 | F5 | API, worker pool and scheduler run in one process | Blocker | Phase 4 worker autoscaling | Fixed |
 | F6 | `/metrics` returns JSON, not Prometheus exposition format | Major | Phase 3 scraping | Fixed |
-| F7 | Worker never persists terminal job status back to Redis | Major | Accurate `/status/{id}` | Open |
+| F7 | Worker never persists terminal job status back to Redis | Major | Accurate `/status/{id}` | Fixed |
+| F8 | Heartbeat monitor crashes when requeueing a stalled worker's job | Blocker | Self-healing worker pool | Fixed |
 
 ### F1 — No Dockerfile
 
@@ -119,12 +120,36 @@ in memory as the job runs and completes, but never writes it back. `GET /status/
 therefore reports `pending` for every job, forever, including ones that finished successfully
 or landed in the dead letter queue.
 
-Deliberately left open. It is a real defect but not a deployment blocker, and it was outside
-the scope of the six findings this branch set out to fix. Prometheus counters record terminal
-status correctly and independently, so Phase 3's availability SLI is unaffected.
+*Fixed.* A `JobStore` now owns the `job:{id}` key and is used by both the API and the worker,
+which persists on every transition. Records carry a 24-hour TTL — without one, every job ever
+submitted leaves a permanent Redis key behind. Saves never raise: a worker must not fail a job
+it executed successfully because a status write did not land.
 
-*Needs:* the worker to hold a Redis client and write the job record on each terminal
-transition, with a TTL so completed job records do not accumulate without bound.
+## F8 — The heartbeat monitor could not requeue a stalled worker's job
+
+Found while fixing F7, and the most serious finding in this review.
+
+`worker_pool._monitor` assigned the string `"pending"` to `current_job.status`, where the rest
+of the codebase uses the `JobStatus` enum. `Job.to_dict()` reads `status.value`, so the very
+next statement — `queue.push(job)` — raised `AttributeError: 'str' object has no attribute
+'value'`.
+
+That exception was raised inside the monitor's daemon thread, which had no handler. The first
+time a worker actually stalled, the pool stopped replacing stalled workers entirely, and
+nothing reported it. Silent, and permanent for the life of the process.
+
+This matters beyond the bug itself: the self-healing worker pool is the headline claim on the
+resume this project supports. The mechanism was real, but the recovery path it existed to
+perform would have failed the first time it was needed.
+
+*Fixed.* Assigns `JobStatus.PENDING`. The monitor loop body is wrapped so a future failure
+costs one cycle instead of ending self-healing for good, and says so on stdout. `check_once()`
+is extracted from the loop so the path is directly testable rather than only observable by
+waiting on a background thread, and replacements increment
+`orion_workers_replaced_total` so a pool quietly churning through stalled workers is visible.
+
+Three regression tests cover it: replacement happens, the requeued job survives serialisation,
+and healthy workers are left alone.
 
 ## Resolution
 

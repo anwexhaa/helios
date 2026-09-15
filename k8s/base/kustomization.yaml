@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Descriptive only. includeSelectors stays false because a label baked
+# into a Deployment's selector cannot be changed afterwards without
+# deleting and recreating the Deployment.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: helios
+    includeSelectors: false
+
+resources:
+  - configmap.yaml
+  - redis.yaml
+  - api.yaml
+  - worker.yaml
+  - scheduler.yaml
+
+images:
+  # The pipeline replaces the tag with the git SHA:
+  #   kustomize edit set image orion-queue=$(ACR)/orion-queue:$(Build.SourceVersion)
+  # Never deploy a tag called latest - you cannot tell what is running.
+  - name: orion-queue
+    newName: orion-queue
+    newTag: dev

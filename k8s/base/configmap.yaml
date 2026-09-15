@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orion-config
+data:
+  # Redis runs in-cluster. This is the single value that must not be
+  # "localhost" — in a pod that resolves to the pod itself.
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  QUEUE_KEY: "task_queue"
+  DLQ_KEY: "dead_letter_queue"
+  DELAYED_KEY: "delayed_queue"
+
+  # Threads inside each worker process. Horizontal scale is KEDA's job;
+  # this is how much work one replica does.
+  WORKER_COUNT: "4"
+  SCHEDULER_POLL_INTERVAL: "0.5"
+
+  JOB_TTL_SECONDS: "86400"
+
+  HTTP_HOST: "0.0.0.0"
+  HTTP_PORT: "8000"

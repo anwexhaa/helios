@@ -14,7 +14,7 @@ The platform is the project.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Ground work — accounts, toolchain, repo scaffold | Done |
-| 1 | Cluster and infrastructure as code | Written, not yet applied |
+| 1 | Cluster and infrastructure as code | Terraform and manifests written, not yet applied |
 | 2 | Multi-environment delivery pipeline | Not started |
 | 3 | Observability, SLOs and alerting | Not started |
 | 4 | Autoscaling, chaos and incident response | Not started |
@@ -56,13 +56,13 @@ make down        # destroy everything
 
 ## The service being operated
 
-Orion Queue is not modified by this repo; Helios deploys it. A production readiness review of
-it was carried out before any infrastructure was provisioned, and found six issues that block
-deployment — no Dockerfile, a UTF-16 `requirements.txt`, a hardcoded Redis host, no health
-endpoint, API and workers sharing one process, and JSON rather than Prometheus metrics.
+Orion Queue is not modified by this repo; Helios deploys it. A production readiness review was
+carried out before any infrastructure was provisioned. It found eight issues, all now fixed on
+the `feat/kubernetes-readiness` branch of orion-queue — including a heartbeat monitor that
+would have crashed the first time a worker actually stalled, taking the service's self-healing
+with it.
 
-See [docs/production-readiness-review.md](docs/production-readiness-review.md). Those findings
-are the backlog that has to clear before the service can run in the cluster.
+See [docs/production-readiness-review.md](docs/production-readiness-review.md).
 
 ## Cost
 

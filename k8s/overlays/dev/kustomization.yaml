@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: helios-dev
+namePrefix: ""
+
+resources:
+  - ../../base
+
+# Smallest viable footprint: dev exists to catch broken manifests, not to
+# absorb load.
+replicas:
+  - name: orion-api
+    count: 1
+  - name: orion-worker
+    count: 1
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: orion-config
+    patch: |-
+      - op: replace
+        path: /data/WORKER_COUNT
+        value: "2"

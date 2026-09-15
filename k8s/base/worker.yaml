@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orion-worker
+  labels:
+    app.kubernetes.io/name: orion-worker
+    app.kubernetes.io/component: worker
+spec:
+  # KEDA owns this number from Phase 4 onward. It is the floor, not the target.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: orion-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: orion-worker
+        app.kubernetes.io/component: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # The worker drains on SIGTERM, finishing in-flight jobs rather than
+      # dropping them back on the queue. Its grace period is 20s, so give
+      # Kubernetes room to let that complete before SIGKILL.
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: orion-queue
+          command: ["python", "worker_main.py"]
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: orion-config
+          env:
+            - name: ORION_ROLE
+              value: worker
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            # Requests are what the cluster autoscaler reasons about. Set them
+            # honestly or it cannot decide whether a new node is needed.
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
