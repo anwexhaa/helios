@@ -7,20 +7,21 @@ The point of a PRR is to find out what the platform will have to work around *be
 platform exists. Six findings, none of them surprising for a service that has only ever run on
 a developer's laptop.
 
-**Current decision: the application is not being changed yet.** Helios proceeds with
-infrastructure first; these findings are the backlog that has to clear before the service can
-actually run in the cluster.
+**Status: all six findings are addressed** on the `feat/kubernetes-readiness` branch of
+orion-queue, not yet merged or pushed. The sections below describe each finding as it was
+found; the resolution is recorded at the end of each.
 
 ## Findings
 
-| # | Finding | Severity | Blocks |
-|---|---------|----------|--------|
-| F1 | No Dockerfile. `docker-compose.yml` starts Redis only; the app runs on the host | Blocker | Phase 1 first deploy |
-| F2 | `requirements.txt` is UTF-16LE, not UTF-8 | Blocker | Any Linux image build |
-| F3 | Redis host hardcoded to `localhost` in four files | Blocker | Any deployment to Kubernetes |
-| F4 | No `/health` endpoint | Blocker | Probes, Phase 2 smoke test |
-| F5 | API, worker pool and scheduler run in one process | Blocker | Phase 4 worker autoscaling |
-| F6 | `/metrics` returns JSON, not Prometheus exposition format | Major | Phase 3 scraping |
+| # | Finding | Severity | Blocks | Status |
+|---|---------|----------|--------|--------|
+| F1 | No Dockerfile. `docker-compose.yml` starts Redis only; the app runs on the host | Blocker | Phase 1 first deploy | Fixed |
+| F2 | `requirements.txt` is UTF-16LE, not UTF-8 | Blocker | Any Linux image build | Fixed |
+| F3 | Redis host hardcoded to `localhost` in four files | Blocker | Any deployment to Kubernetes | Fixed |
+| F4 | No `/health` endpoint | Blocker | Probes, Phase 2 smoke test | Fixed |
+| F5 | API, worker pool and scheduler run in one process | Blocker | Phase 4 worker autoscaling | Fixed |
+| F6 | `/metrics` returns JSON, not Prometheus exposition format | Major | Phase 3 scraping | Fixed |
+| F7 | Worker never persists terminal job status back to Redis | Major | Accurate `/status/{id}` | Open |
 
 ### F1 — No Dockerfile
 
@@ -108,3 +109,37 @@ scaler changes instead:
   scales on the same number the SLO dashboard shows
 
 Recorded as decision D6.
+
+## F7 — Terminal job status is never written back to Redis
+
+Found while instrumenting the worker, after the original six.
+
+`api.py` writes `job:{id}` to Redis at submission time. `worker.py` then mutates `job.status`
+in memory as the job runs and completes, but never writes it back. `GET /status/{job_id}`
+therefore reports `pending` for every job, forever, including ones that finished successfully
+or landed in the dead letter queue.
+
+Deliberately left open. It is a real defect but not a deployment blocker, and it was outside
+the scope of the six findings this branch set out to fix. Prometheus counters record terminal
+status correctly and independently, so Phase 3's availability SLI is unaffected.
+
+*Needs:* the worker to hold a Redis client and write the job record on each terminal
+transition, with a TTL so completed job records do not accumulate without bound.
+
+## Resolution
+
+Fixed on `feat/kubernetes-readiness` in orion-queue. Not merged, not pushed.
+
+| Finding | Resolution |
+|---------|-----------|
+| F1 | Multi-stage `Dockerfile`, non-root uid 10001, one image for all three roles, `PYTHONUNBUFFERED` so logs reach `kubectl logs` |
+| F2 | Converted to UTF-8 with all 15 original pins preserved; `prometheus-client` added |
+| F3 | New `config.py` reads every setting from the environment, defaulting to the old hardcoded values; all four call sites converted |
+| F4 | `/health` (liveness, no dependency check) and `/ready` (readiness, Redis round-trip) on all three processes |
+| F5 | Split into `api_main.py`, `worker_main.py` and `scheduler_main.py`, with SIGTERM draining in the worker; `main.py` kept as the local all-in-one |
+| F6 | `metrics.py` exposes ten Prometheus collectors; the original JSON moved to `/stats` for KEDA's metrics-api scaler |
+
+The dispatch latency histogram carries an explicit bucket boundary at 0.3s so the Phase 3
+latency SLI — 95% of jobs dispatched within 300 ms — can be computed exactly rather than
+interpolated between buckets. If the SLO target changes, `DISPATCH_BUCKETS` has to change with
+it.
