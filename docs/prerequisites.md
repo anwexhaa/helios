@@ -23,11 +23,11 @@ Verified on Windows 11 with `make preflight`.
 |------|--------|---------|
 | git | 2.53.0 | installed |
 | docker | 29.2.1 | installed |
-| kubectl | installed | ships with Docker Desktop |
+| kubectl | 1.34.1 | ships with Docker Desktop |
 | python | 3.12.10 | installed |
-| az | **missing** | `winget install Microsoft.AzureCLI` |
-| terraform | **missing** | `winget install Hashicorp.Terraform` |
-| helm | **missing** | `winget install Helm.Helm` |
+| az | 2.90.0 | installed |
+| terraform | 1.16.2 | installed |
+| helm | 4.3.0 | installed |
 | k6 | missing (Phase 4) | `winget install Grafana.k6` |
 
 Open a new shell after installing so the updated `PATH` is picked up, then:

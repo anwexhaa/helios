@@ -1,6 +1,7 @@
 # --- Terraform ---
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl is deliberately NOT ignored. It pins provider
+# versions so every machine and the CI pipeline resolve identically.
 *.tfstate
 *.tfstate.*
 crash.log

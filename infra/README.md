@@ -45,12 +45,12 @@ defect in the infrastructure code, and better found now than during Phase 2.
 
 ## Status
 
-**Not yet validated.** This configuration was written before `terraform` was installed locally,
-so nothing has run `terraform validate` against it. Expect the first `make validate` to surface
-argument-name mismatches — the azurerm provider renamed a number of arguments in v4, and this
-code targets v4.
+**Validated.** `terraform validate` passes against azurerm 4.81.0 and `terraform fmt` reports
+the files already canonical. Provider versions are pinned in `.terraform.lock.hcl`, which is
+committed.
 
-Run `make fmt` and `make validate` before the first `make plan`, and fix what they report.
+Validation checks syntax and argument names, not Azure's opinion of the plan. Quotas, region
+capacity and name collisions only surface at `make plan`, which needs `az login` first.
 
 ## Cost
 
