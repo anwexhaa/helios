@@ -55,9 +55,13 @@ upgrading to pay-as-you-go is the only route to more.
 |-------|-------|
 | Total Regional vCPUs (centralindia) | 4 |
 | Standard BS Family vCPUs | 4 |
+| Standard Bsv2 Family vCPUs | 4 |
 
-Standard_B2s is 2 vCPUs, so the node pool tops out at **two nodes**. `node_max_count` is set to
-2 accordingly. Recorded as decision D8.
+Standard_B2s_v2 is 2 vCPUs, so the node pool tops out at **two nodes**. `node_max_count` is set
+to 2 accordingly. Recorded as decision D8.
+
+Note the VM size: `Standard_B2s` (v1) is not offered to this subscription in centralindia at all
+and AKS rejects it outright. See D9.
 
 Re-check any time with:
 

@@ -66,7 +66,7 @@ See [docs/production-readiness-review.md](docs/production-readiness-review.md).
 
 ## Cost
 
-The cluster runs on burstable B2s nodes and costs roughly ₹80–120 per day while it is up.
+The cluster runs on burstable B2s_v2 nodes and costs roughly ₹80–120 per day while it is up.
 The AKS control plane itself is free; the node pool, the Log Analytics workspace and the
 container registry are not.
 

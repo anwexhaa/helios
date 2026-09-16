@@ -53,7 +53,7 @@ smoke: ## Smoke test one environment via port-forward: make smoke ENV=dev
 	@bash -c 'kubectl -n helios-$(ENV) port-forward svc/orion-api 18080:80 >/dev/null 2>&1 & pf=$$!; sleep 5; ./scripts/smoke.sh http://localhost:18080; rc=$$?; kill $$pf 2>/dev/null; exit $$rc'
 
 cost: ## Rough daily cost of what is currently running
-	@echo "Node pool:       ~rs 75/day per Standard_B2s node"
+	@echo "Node pool:       ~rs 85/day per Standard_B2s_v2 node"
 	@echo "Log Analytics:   free below 5 GB ingested per month"
 	@echo "ACR Basic:       ~rs 15/day"
 	@echo "Load balancer:   ~rs 20/day while a Service of type LoadBalancer exists"

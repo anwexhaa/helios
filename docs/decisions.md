@@ -163,3 +163,34 @@ capacity. Scale down to one node first, or raise the quota.
 **Note.** The subscription also has `spendingLimit: On`. When the credit is exhausted the
 subscription is disabled rather than charged. That is the desired behaviour for a learning
 project and should be left alone.
+
+---
+
+## D9 — Standard_B2s_v2, because the v1 B-series is not offered here
+
+**Decision.** The node pool runs `Standard_B2s_v2`.
+
+**Why.** `Standard_B2s` was rejected outright by AKS:
+
+> The VM size of Standard_B2s is not allowed in your subscription in location 'centralindia'.
+
+Not a quota problem — the SKU simply is not offered to this subscription in this region. The v1
+B-series has been superseded by Bsv2 nearly everywhere.
+
+`Standard_B2s_v2` is the same 2 vCPUs, so it costs exactly the same against the 4 vCPU cap, and
+carries **8 GiB of memory rather than 4**. Its quota lives in a separate bucket, `Standard Bsv2
+Family vCPUs`, which is also 4. Strictly better for the same price.
+
+**Consequence.** Twice the memory per node, so the memory side of the Phase 4 sizing has more
+headroom than D8 assumed. The CPU arithmetic in D8 is unchanged and remains the binding
+constraint.
+
+**Watch out.** B2s_v2 carries a *zone* restriction in centralindia: zones 1 and 3 are closed to
+this subscription, zone 2 is open. The node pool is deliberately non-zonal, so this does not
+apply — but adding `zones` to `default_node_pool` would reintroduce it, and the failure would
+appear at apply time as a capacity error rather than anything obviously zone-related.
+
+**How this was found.** By reading the error, then querying `az vm list-skus` for the
+restriction *type* rather than assuming the region was unavailable. The distinction between a
+Zone restriction and a Location restriction is the difference between changing one variable and
+moving the whole build to another region.

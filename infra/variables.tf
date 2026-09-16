@@ -28,9 +28,22 @@ variable "kubernetes_version" {
 }
 
 variable "node_size" {
-  description = "VM size for the cluster node pool. B-series is burstable and the cheapest option that will run this workload."
+  description = "VM size for the cluster node pool. Burstable B-series is the cheapest option that will run this workload."
   type        = string
-  default     = "Standard_B2s"
+
+  # B2s_v2, not B2s. The v1 B-series is not offered to this subscription in
+  # centralindia at all - AKS rejects it with "The VM size of Standard_B2s is
+  # not allowed in your subscription in location 'centralindia'".
+  #
+  # B2s_v2 is the same 2 vCPUs but 8 GiB rather than 4, so it costs the same
+  # against the vCPU quota and gives twice the memory. Its quota lives in the
+  # separate "Standard Bsv2 Family" bucket, which is also 4.
+  #
+  # It carries a ZONE restriction in centralindia - zones 1 and 3 are closed
+  # to this subscription, zone 2 is open. The node pool is deliberately
+  # non-zonal, so this does not apply. Setting `zones` on the node pool would
+  # reintroduce it.
+  default = "Standard_B2s_v2"
 }
 
 variable "node_min_count" {
