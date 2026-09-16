@@ -21,5 +21,5 @@ images:
   #   kustomize edit set image orion-queue=$(ACR)/orion-queue:$(Build.SourceVersion)
   # Never deploy a tag called latest - you cannot tell what is running.
   - name: orion-queue
-    newName: orion-queue
+    newName: heliosacr9d5z3m.azurecr.io/orion-queue
     newTag: dev

@@ -135,8 +135,10 @@ that choice is deliberate and final.
 
 ### Phase 4 sizing, derived rather than guessed
 
-Two Standard_B2s nodes are 4 vCPUs raw, roughly 3.0 allocatable once AKS takes its reservations,
-and roughly 2.6 usable after system pods. One node alone offers about 1.1 usable.
+**Measured on the running cluster**, not estimated: a Standard_B2s_v2 node reports **1900m
+allocatable CPU** and 6.6 GiB allocatable memory. Two nodes is therefore 3.8 vCPU allocatable,
+better than the 3.0 originally assumed here. The dev deployment actually requests 220m, leaving
+1.68 vCPU of headroom on a single node.
 
 Worker CPU requests are therefore **150m in production, not 200m**, and KEDA's ceiling is
 **8 replicas**:
@@ -146,11 +148,16 @@ Worker CPU requests are therefore **150m in production, not 200m**, and KEDA's c
 | at rest (2) | 0.47 | yes |
 | 4 | 0.77 | yes |
 | 6 | 1.07 | marginal |
-| **8** | **1.37** | **no — a second node is required** |
+| **8** | **1.37** | **yes on 1.9 allocatable — see below** |
 
-That is the whole point. At 8 workers the scheduler genuinely cannot place the pods on one node,
-so the cluster autoscaler has to add the second — a real demonstration rather than a staged one —
-while the total stays well inside the two-node cap.
+**Revised once the node was measured.** At 1900m allocatable rather than the assumed 1500m, 8
+workers at 150m (1.37 vCPU total) still fit on a single node once system pods are accounted for,
+so this would not force a second node after all. Phase 4 needs either a higher KEDA ceiling or
+larger worker requests to make the cluster autoscaler actually engage — the exact figure to be
+fixed by measuring real system pod usage under load, not by guessing again.
+
+The lesson stands either way: size the experiment so the autoscaler is what responds, and verify
+against the real cluster rather than an estimate.
 
 At 200m per worker the same experiment would have hit the vCPU quota instead of the autoscaler,
 and the failure would have looked like KEDA being broken rather than the subscription being

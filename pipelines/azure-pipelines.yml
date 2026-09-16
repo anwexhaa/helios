@@ -108,12 +108,29 @@ stages:
               inlineScript: |
                 set -euo pipefail
                 cd orion-queue
-                # az acr build runs the build inside ACR, so the agent never
-                # needs registry credentials of its own.
-                az acr build \
-                  --registry "$(acrName)" \
-                  --image "$(imageName):$(imageTag)" \
-                  --file Dockerfile .
+
+                # Built on the agent and pushed, rather than with `az acr
+                # build`. ACR Tasks — which is what az acr build uses — is
+                # refused on this subscription:
+                #
+                #   (TasksOperationsNotAllowed) ACR Tasks requests for the
+                #   registry ... are not permitted.
+                #
+                # Server-side builds are not offered on free trial
+                # subscriptions. `az acr login` still works, so the agent
+                # authenticates with the service connection's identity and no
+                # registry password is stored anywhere.
+                az acr login --name "$(acrName)"
+
+                # --platform pinned: the agent and the AKS nodes are both
+                # x64 today, but an ARM agent would otherwise produce an
+                # image that fails to start with exec format error.
+                docker build \
+                  --platform linux/amd64 \
+                  -t "$(acrLoginServer)/$(imageName):$(imageTag)" \
+                  -f Dockerfile .
+
+                docker push "$(acrLoginServer)/$(imageName):$(imageTag)"
 
           - task: AzureCLI@2
             displayName: Vulnerability scan (merge gate)
