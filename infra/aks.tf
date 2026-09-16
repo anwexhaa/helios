@@ -36,6 +36,11 @@ resource "azurerm_kubernetes_cluster" "this" {
     max_pods = 50
 
     upgrade_settings {
+      # AKS always needs at least one surge node during an upgrade, so on a
+      # 4 vCPU quota with two nodes running an upgrade will be refused for
+      # lack of capacity. Scale node_max_count down to 1 before upgrading,
+      # or raise the quota first. Nothing in this build upgrades the node
+      # pool, so this is a note rather than a problem.
       max_surge = "10%"
     }
   }

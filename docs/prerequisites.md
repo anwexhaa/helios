@@ -45,17 +45,39 @@ behind `make` if you would rather not install it.
 It exits non-zero until every required tool is present and `az account show` succeeds, so it
 can gate the rest of the Makefile.
 
-## Azure quota
+## Azure quota — measured, not assumed
 
-Student subscriptions carry a low default vCPU quota per region. Check it before choosing VM
-sizes in Phase 1 — the node pool is 2 vCPUs per B2s, and the cluster autoscaler is allowed to
-reach three nodes:
+This subscription is an Azure **free trial** (`quotaId: FreeTrial_2014-09-01`), which carries a
+hard cap of **4 regional vCPUs**. Microsoft does not raise quota on free trial subscriptions;
+upgrading to pay-as-you-go is the only route to more.
+
+| Quota | Limit |
+|-------|-------|
+| Total Regional vCPUs (centralindia) | 4 |
+| Standard BS Family vCPUs | 4 |
+
+Standard_B2s is 2 vCPUs, so the node pool tops out at **two nodes**. `node_max_count` is set to
+2 accordingly. Recorded as decision D8.
+
+Re-check any time with:
 
 ```bash
-az vm list-usage --location centralindia --output table | grep -i "Total Regional vCPUs"
+az vm list-usage --location centralindia --output table
 ```
 
-If the limit is below 8, either request an increase or lower `max_count` on the node pool.
+## Resource providers
+
+A new subscription has no resource providers registered, and `az vm list-usage` returns an empty
+list until `Microsoft.Compute` is. Terraform would fail partway through the first apply.
+Registered up front:
+
+```bash
+for p in Microsoft.Compute Microsoft.ContainerService Microsoft.ContainerRegistry          Microsoft.Network Microsoft.Storage Microsoft.OperationalInsights          Microsoft.KeyVault Microsoft.ManagedIdentity; do
+  az provider register --namespace "$p"
+done
+```
+
+Registration is asynchronous and took about 30 seconds for all of them.
 
 ## Container image
 

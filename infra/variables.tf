@@ -45,9 +45,21 @@ variable "node_min_count" {
 }
 
 variable "node_max_count" {
-  description = "Ceiling for the cluster autoscaler. Each B2s is 2 vCPUs, so check the subscription quota before raising this."
+  description = "Ceiling for the cluster autoscaler. Each B2s is 2 vCPUs, so this is bounded by the subscription's regional vCPU quota."
   type        = number
-  default     = 3
+
+  # 2, not 3, because this subscription is an Azure free trial: a hard cap of
+  # 4 regional vCPUs that Microsoft does not raise on request. Two B2s nodes
+  # is exactly 4. Raise this to 3 or more only after upgrading to
+  # pay-as-you-go and being granted a higher quota.
+  #
+  #   az vm list-usage --location centralindia --output table
+  default = 2
+
+  validation {
+    condition     = var.node_max_count >= var.node_min_count
+    error_message = "node_max_count must be greater than or equal to node_min_count."
+  }
 }
 
 variable "log_retention_days" {

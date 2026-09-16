@@ -113,3 +113,32 @@ answer to give if asked about it in an interview.
 **Consequence.** Application pods and system pods are scheduled together. If a chaos experiment
 in Phase 4 destabilises the node, expect cluster components to wobble too. Note it in the game
 day record rather than treating it as a surprise.
+
+---
+
+## D8 — The node pool tops out at two nodes, because the subscription is a free trial
+
+**Decision.** `node_max_count` defaults to 2, not 3.
+
+**Why.** The subscription's `quotaId` is `FreeTrial_2014-09-01`, which carries a hard limit of
+**4 regional vCPUs** in every region. Standard_B2s is 2 vCPUs, so two nodes is exactly the cap
+and three is impossible. Unlike pay-as-you-go quota, this one is not raised on request —
+Microsoft does not grant increases on free trial subscriptions. Upgrading to pay-as-you-go is
+the only route to more.
+
+This was found by querying `az vm list-usage` before the first apply rather than by watching
+the apply fail, which is the difference between a constraint and an incident.
+
+**Consequence.** The cluster autoscaler can still be demonstrated — it scales 1 to 2 nodes, and
+the mechanism is identical. What is capped is Phase 4's headroom: KEDA scaling workers to 10
+replicas at 200m each is 2 vCPUs of requests, which fills a 2-node cluster rather than
+triggering a third node. Either scale the Phase 4 demonstration to what fits, or upgrade the
+subscription first and raise `node_max_count`.
+
+A second consequence worth knowing before it bites: AKS needs at least one surge node during a
+node pool upgrade, so with two nodes running at the cap, an upgrade will be refused for lack of
+capacity. Scale down to one node first, or raise the quota.
+
+**Note.** The subscription also has `spendingLimit: On`. When the credit is exhausted the
+subscription is disabled rather than charged. That is the desired behaviour for a learning
+project and should be left alone.
