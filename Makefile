@@ -41,8 +41,16 @@ down: ## Destroy the environment. Run this at the end of every session.
 creds: ## Write this cluster into your kubeconfig
 	@eval "$$($(TF) output -raw get_credentials)"
 
-namespaces: ## Show the three environment namespaces
+namespaces: ## Create the three environment namespaces with quotas. Run once after make up.
+	@kubectl apply -f k8s/namespaces.yaml
 	@kubectl get namespace -l app.kubernetes.io/part-of=helios
+
+deploy: ## Deploy the app to one environment: make deploy ENV=dev
+	@kubectl apply -k k8s/overlays/$(ENV)
+	@kubectl -n helios-$(ENV) rollout status deploy/orion-api --timeout=180s
+
+smoke: ## Smoke test one environment via port-forward: make smoke ENV=dev
+	@bash -c 'kubectl -n helios-$(ENV) port-forward svc/orion-api 18080:80 >/dev/null 2>&1 & pf=$$!; sleep 5; ./scripts/smoke.sh http://localhost:18080; rc=$$?; kill $$pf 2>/dev/null; exit $$rc'
 
 cost: ## Rough daily cost of what is currently running
 	@echo "Node pool:       ~rs 75/day per Standard_B2s node"

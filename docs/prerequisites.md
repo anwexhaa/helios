@@ -22,6 +22,7 @@ Verified on Windows 11 with `make preflight`.
 | Tool | Status | Install |
 |------|--------|---------|
 | git | 2.53.0 | installed |
+| make | **missing** | `winget install -e --id ezwinports.make` |
 | docker | 29.2.1 | installed |
 | kubectl | 1.34.1 | ships with Docker Desktop |
 | python | 3.12.10 | installed |
@@ -35,6 +36,11 @@ Open a new shell after installing so the updated `PATH` is picked up, then:
 ```bash
 make preflight
 ```
+
+**Run `make` from Git Bash, not PowerShell.** The Makefile sets `SHELL := /bin/bash` and its
+recipes are POSIX shell; PowerShell cannot resolve `/bin/bash`. Every target also has a plain
+equivalent — `make preflight` is just `./scripts/preflight.sh` — so nothing here is locked
+behind `make` if you would rather not install it.
 
 It exits non-zero until every required tool is present and `az account show` succeeds, so it
 can gate the rest of the Makefile.

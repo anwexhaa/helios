@@ -1,0 +1,128 @@
+# The three environment namespaces, with a quota and defaults on each.
+#
+# Applied once after the cluster is created, separately from the application
+# overlays. Namespaces are bootstrap, not part of a deploy: a pipeline that
+# can create namespaces can also create them in the wrong place.
+#
+#   kubectl apply -f k8s/namespaces.yaml
+#
+# The quotas exist because all three environments share one small node pool.
+# Without them, a runaway dev deployment starves production on the same
+# cluster — which is exactly the failure a shared cluster invites.
+#
+# The LimitRange matters more than it looks: once a ResourceQuota constrains
+# requests.cpu, any pod WITHOUT resource requests is rejected outright. The
+# defaults here mean a manifest that forgets them still schedules, rather than
+# failing with an error that reads like a quota problem.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helios-dev
+  labels:
+    app.kubernetes.io/part-of: helios
+    helios.env: dev
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: helios-quota
+  namespace: helios-dev
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "15"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: helios-defaults
+  namespace: helios-dev
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 300m
+        memory: 256Mi
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helios-test
+  labels:
+    app.kubernetes.io/part-of: helios
+    helios.env: test
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: helios-quota
+  namespace: helios-test
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "15"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: helios-defaults
+  namespace: helios-test
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 300m
+        memory: 256Mi
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helios-prod
+  labels:
+    app.kubernetes.io/part-of: helios
+    helios.env: prod
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: helios-quota
+  namespace: helios-prod
+spec:
+  # Sized for Phase 4. KEDA scales workers to 10 replicas at 200m each, which
+  # is 2 CPU of requests before the API, scheduler and Redis are counted. A
+  # quota below that would cap the autoscaling demonstration, and it would
+  # look like KEDA was broken rather than like the quota was too small.
+  hard:
+    requests.cpu: "3"
+    requests.memory: 3Gi
+    limits.cpu: "6"
+    limits.memory: 6Gi
+    pods: "40"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: helios-defaults
+  namespace: helios-prod
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      default:
+        cpu: 300m
+        memory: 256Mi

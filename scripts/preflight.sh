@@ -7,7 +7,7 @@
 
 set -uo pipefail
 
-REQUIRED=(git docker az kubectl helm terraform)
+REQUIRED=(git make docker az kubectl helm terraform)
 OPTIONAL=(k6 kubectx k9s trivy)
 
 missing=0
@@ -15,6 +15,7 @@ missing=0
 version_of() {
   case "$1" in
     git)       git --version ;;
+    make)      make --version | head -1 ;;
     docker)    docker --version ;;
     az)        az version --output tsv --query '"azure-cli"' 2>/dev/null | head -1 ;;
     kubectl)   kubectl version --client --output=yaml 2>/dev/null | grep -m1 gitVersion | awk '{print $2}' ;;
