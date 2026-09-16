@@ -14,10 +14,10 @@ The platform is the project.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Ground work — accounts, toolchain, repo scaffold | Done |
-| 1 | Cluster and infrastructure as code | Terraform and manifests written, not yet applied |
+| 1 | Cluster and infrastructure as code | **Done** — clean rebuild from empty in about 6 minutes |
 | 2 | Multi-environment delivery pipeline | Pipeline and smoke test written; never run |
-| 3 | Observability, SLOs and alerting | Written and validated; not yet installed |
-| 4 | Autoscaling, chaos and incident response | Written and validated; game days not yet run |
+| 3 | Observability, SLOs and alerting | **Run on a live cluster** — alerts fired on real breaches |
+| 4 | Autoscaling, chaos and incident response | **Four game days run** — see [gamedays.md](docs/gamedays.md) |
 
 ## Layout
 

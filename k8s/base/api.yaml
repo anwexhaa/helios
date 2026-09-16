@@ -52,6 +52,13 @@ spec:
           # Readiness does check Redis: a pod that cannot reach it cannot
           # accept a job and should leave the Service until it can.
           readinessProbe:
+            # timeoutSeconds 3, above the application's own 1-second Redis
+            # timeout. With both at 1s there is no headroom: under slow
+            # Redis the kubelet gives up first and reports 'context
+            # deadline exceeded', instead of the app answering a clean 503
+            # itself. Found in game day 3's re-run: one API probe tipped
+            # over at +500ms latency. The kubelet's default is 1s.
+            timeoutSeconds: 3
             httpGet:
               path: /ready
               port: http

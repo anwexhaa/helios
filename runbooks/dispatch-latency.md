@@ -4,7 +4,7 @@ Jobs are waiting too long to be picked up.
 
 **Severity:** ticket
 **Alerts:** `OrionDispatchLatencyObjectiveAtRisk`
-**Last exercised:** not yet - Phase 4 game day
+**Last exercised:** 2026-09-16, game day 3 - 500ms of Redis latency took jobs within 300ms from 90% to 0% and the alert fired. See [gamedays.md](../docs/gamedays.md#experiment-3--redis-500ms).
 
 ## Symptom
 

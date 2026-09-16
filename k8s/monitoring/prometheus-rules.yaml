@@ -19,28 +19,40 @@ spec:
     # ---------------------------------------------------------------------
     - name: orion-slo-availability
       interval: 30s
+      # Every numerator below carries `or vector(0)`, and it is load-bearing.
+      #
+      # Found by running this live: with zero 5xx responses, no series
+      # matching status=~"5.." exists at all, sum() over nothing is empty
+      # rather than 0, and the whole ratio vanished. The dashboard showed "no
+      # data" for a service that was 100% available.
+      #
+      # vector(0) only fills the numerator. With no traffic at all the
+      # denominator is still empty, so the ratio is still absent - which is
+      # the intended "an idle service has proved nothing" behaviour from
+      # docs/slo.md. The fix distinguishes "no errors" from "no traffic",
+      # which the original expression could not.
       rules:
         - record: job:slo_errors:ratio_rate5m
           expr: |
-            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[5m]))
+            (sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[5m])) or vector(0))
               /
             sum(rate(orion_http_requests_total{namespace="helios-prod"}[5m]))
 
         - record: job:slo_errors:ratio_rate30m
           expr: |
-            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[30m]))
+            (sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[30m])) or vector(0))
               /
             sum(rate(orion_http_requests_total{namespace="helios-prod"}[30m]))
 
         - record: job:slo_errors:ratio_rate1h
           expr: |
-            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[1h]))
+            (sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[1h])) or vector(0))
               /
             sum(rate(orion_http_requests_total{namespace="helios-prod"}[1h]))
 
         - record: job:slo_errors:ratio_rate6h
           expr: |
-            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[6h]))
+            (sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[6h])) or vector(0))
               /
             sum(rate(orion_http_requests_total{namespace="helios-prod"}[6h]))
 
@@ -49,7 +61,7 @@ spec:
         - record: job:slo_error_budget_remaining:ratio
           expr: |
             1 - (
-              sum(increase(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[28d]))
+              (sum(increase(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[28d])) or vector(0))
                 /
               sum(increase(orion_http_requests_total{namespace="helios-prod"}[28d]))
             ) / 0.005

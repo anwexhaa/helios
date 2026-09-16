@@ -1,0 +1,46 @@
+draining: aks-system-30472714-vmss000000
+application pods on it:
+  orion-api-55995c4f-cnvvw
+  orion-scheduler-7c6b995f6-nl8db
+
+  t+  1s  pending_pods=0    submit=200
+  t+ 12s  pending_pods=14   submit=200
+  t+ 23s  pending_pods=8    submit=200
+  t+ 35s  pending_pods=3    submit=200
+  t+ 46s  pending_pods=1    submit=200
+  t+ 57s  pending_pods=0    submit=200
+  t+ 68s  pending_pods=1    submit=200
+  t+ 80s  pending_pods=1    submit=200
+  t+ 91s  pending_pods=1    submit=200
+
+drain exit 0 after 103s
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+pod/metrics-server-699498b485-8spzs evicted
+node/aks-system-30472714-vmss000000 drained
+
+Pending pods on the surviving node, by namespace:
+        2 keda
+        1 kube-system
+        1 monitoring
+
+helios-prod after the drain:
+  orion-api-55995c4f-t2spd 1/1 Running
+  orion-api-55995c4f-vchk8 1/1 Running
+  orion-scheduler-7c6b995f6-hzvld 1/1 Running
+  orion-worker-77d6d75fb4-kjcv8 1/1 Running
+  redis-5fcbd677c8-rcvpb 1/1 Running
+
+smoke test on the surviving node:
+Smoke test against http://localhost:18001/api/v1/namespaces/helios-prod/services/orion-api:80/proxy
+  ok    /health returned 200
+  ok    /ready returned 200
+  ok    /metrics serves Prometheus exposition format
+  ok    POST /submit accepted a job (654a1438-6499-4e10-9ad9-6d3e1b31d9f6)
+  ok    job reached done within 45s
+  ok    unknown job returns 404
+
+Smoke test passed.
+
+uncordoning aks-system-30472714-vmss000000

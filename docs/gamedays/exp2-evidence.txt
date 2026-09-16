@@ -1,0 +1,106 @@
+baseline: ready=200 submit=200
+injecting at 12:43:11Z
+  t+  1s  ready=503  submit=200  redis_pod_ready=true
+  t+ 11s  ready=200  submit=200  redis_pod_ready=true
+  t+ 15s  ready=200  submit=200  redis_pod_ready=true
+  t+ 19s  ready=200  submit=200  redis_pod_ready=true
+  t+ 23s  ready=200  submit=200  redis_pod_ready=true
+  t+ 27s  ready=200  submit=200  redis_pod_ready=true
+  t+ 31s  ready=200  submit=200  redis_pod_ready=true
+  t+ 35s  ready=200  submit=200  redis_pod_ready=true
+  t+ 38s  ready=200  submit=200  redis_pod_ready=true
+  t+ 42s  ready=200  submit=200  redis_pod_ready=true
+  t+ 46s  ready=200  submit=200  redis_pod_ready=true
+  t+ 50s  ready=200  submit=200  redis_pod_ready=true
+  t+ 54s  ready=200  submit=200  redis_pod_ready=true
+  t+ 58s  ready=200  submit=200  redis_pod_ready=true
+  t+ 61s  ready=200  submit=200  redis_pod_ready=true
+  t+ 66s  ready=200  submit=200  redis_pod_ready=true
+  t+ 70s  ready=200  submit=200  redis_pod_ready=true
+  t+ 73s  ready=200  submit=200  redis_pod_ready=true
+  t+ 77s  ready=200  submit=200  redis_pod_ready=true
+  t+ 81s  ready=200  submit=200  redis_pod_ready=true
+  t+ 85s  ready=200  submit=200  redis_pod_ready=true
+  t+ 88s  ready=200  submit=200  redis_pod_ready=true
+  t+ 93s  ready=200  submit=200  redis_pod_ready=true
+  t+ 97s  ready=200  submit=200  redis_pod_ready=true
+  t+101s  ready=200  submit=200  redis_pod_ready=true
+  t+105s  ready=200  submit=200  redis_pod_ready=true
+  t+109s  ready=200  submit=200  redis_pod_ready=true
+  t+113s  ready=200  submit=200  redis_pod_ready=true
+  t+117s  ready=200  submit=200  redis_pod_ready=true
+  t+121s  ready=200  submit=200  redis_pod_ready=true
+  t+125s  ready=200  submit=200  redis_pod_ready=true
+  t+129s  ready=200  submit=200  redis_pod_ready=true
+  t+133s  ready=200  submit=200  redis_pod_ready=true
+  t+137s  ready=200  submit=200  redis_pod_ready=true
+  t+141s  ready=200  submit=200  redis_pod_ready=true
+  t+145s  ready=200  submit=200  redis_pod_ready=true
+  t+149s  ready=200  submit=200  redis_pod_ready=true
+  t+153s  ready=200  submit=200  redis_pod_ready=true
+  t+157s  ready=200  submit=200  redis_pod_ready=true
+  t+161s  ready=200  submit=200  redis_pod_ready=true
+  t+166s  ready=200  submit=200  redis_pod_ready=true
+  t+170s  ready=200  submit=200  redis_pod_ready=true
+  t+174s  ready=200  submit=200  redis_pod_ready=true
+  t+178s  ready=200  submit=200  redis_pod_ready=true
+  t+182s  ready=200  submit=200  redis_pod_ready=true
+  t+186s  ready=200  submit=200  redis_pod_ready=true
+  t+189s  ready=200  submit=200  redis_pod_ready=true
+  t+193s  ready=200  submit=200  redis_pod_ready=true
+  t+197s  ready=200  submit=200  redis_pod_ready=true
+  t+201s  ready=200  submit=200  redis_pod_ready=true
+  t+205s  ready=200  submit=200  redis_pod_ready=true
+  t+208s  ready=200  submit=200  redis_pod_ready=true
+  t+213s  ready=200  submit=200  redis_pod_ready=true
+  t+217s  ready=200  submit=200  redis_pod_ready=true
+  t+221s  ready=200  submit=200  redis_pod_ready=true
+  t+224s  ready=200  submit=200  redis_pod_ready=true
+  t+228s  ready=200  submit=200  redis_pod_ready=true
+  t+232s  ready=200  submit=200  redis_pod_ready=true
+  t+236s  ready=200  submit=200  redis_pod_ready=true
+  t+240s  ready=200  submit=200  redis_pod_ready=true
+gave up after 240s
+
+first failed submission : t+nevers
+redis pod ready again   : t+11s
+submissions recovered   : t+nevers
+
+smoke test after recovery:
+Smoke test against http://localhost:18080
+  ok    /health returned 200
+  ok    /ready returned 200
+  ok    /metrics serves Prometheus exposition format
+  ok    POST /submit accepted a job (fe96da80-d662-4007-b736-d57bf5a3daf8)
+  ok    job reached done within 45s
+  ok    unknown job returns 404
+
+Smoke test passed.
+
+==========================================================================
+SERVER-SIDE EVIDENCE (the probe above was too coarse to land in the outage)
+==========================================================================
+
+Background k6 at 10/s through kubectl port-forward:
+  submitted 1811, rejected 586, http failures 24.45%, p99 5089ms
+
+Prometheus, 10-minute window:
+  increase(orion_http_requests_total{status="500"}) = 0
+  raw orion_http_requests_total{status="500"}       = 4   (pod ...cnvvw)
+  first sample of the status="500" series: 12:43:18Z, value=4
+
+  The four 500s happened. Prometheus first observed the series already at
+  4, never at 0, so increase() computed 4 - 4 = 0. The availability SLI
+  recorded zero errors for this outage.
+
+  Of 586 client-side failures, only 4 were application 500s. The other 582
+  never reached the application as completed requests; this data cannot
+  separate port-forward resets from requests abandoned while blocked on Redis.
+
+orion_redis_up min over 10m: 0 on both API pods (cnvvw, t2spd).
+OrionRedisUnreachable: reached state=pending only. Outage (~11s) was shorter
+than for: 2m, so it correctly did not page.
+
+Census after the Redis restart: done=1326, queued=0.
+Every job record from before the restart - including all Experiment 1
+evidence - is gone. Expected: Redis is ephemeral by design.

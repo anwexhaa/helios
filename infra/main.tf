@@ -1,18 +1,23 @@
 data "azurerm_client_config" "current" {}
 
-resource "random_string" "suffix" {
-  length  = 6
-  special = false
-  upper   = false
-  numeric = true
-}
-
 locals {
-  name   = "${var.project}-${var.environment}"
-  suffix = random_string.suffix.result
+  name = "${var.project}-${var.environment}"
+
+  # Derived from the subscription id, not random. With a random suffix every
+  # rebuild produced a new registry name, so the image reference in
+  # k8s/base/kustomization.yaml went stale on every `make up` and had to be
+  # edited by hand. A hash is still globally unique in practice and stays the
+  # same across rebuilds of the same subscription.
+  #
+  # Trade-off: Key Vault now reuses its name, so a soft-deleted vault from the
+  # last teardown must be purged first. purge_soft_delete_on_destroy in
+  # versions.tf does that; if a destroy is interrupted before the purge, the
+  # next apply fails on a name collision until the vault is purged by hand.
+  suffix = substr(sha1(data.azurerm_client_config.current.subscription_id), 0, 6)
 
   # Container registry and Key Vault names are globally unique across all of
-  # Azure, so both carry the random suffix. ACR allows alphanumerics only.
+  # Azure, so both carry the suffix. ACR allows alphanumerics only, which a
+  # hex digest satisfies.
   acr_name = "${var.project}acr${local.suffix}"
   kv_name  = "${var.project}-kv-${local.suffix}"
 

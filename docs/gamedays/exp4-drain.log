@@ -1,0 +1,118 @@
+node/aks-system-30472714-vmss000000 already cordoned
+Warning: ignoring DaemonSet-managed Pods: calico-system/calico-node-cb7s7, chaos-testing/chaos-daemon-5w2ls, kube-system/aks-secrets-store-csi-driver-4npnx, kube-system/aks-secrets-store-provider-azure-j87dl, kube-system/ama-logs-5wdsj, kube-system/azure-cns-dqlqb, kube-system/azure-ip-masq-agent-2hz27, kube-system/cloud-node-manager-nwc6w, kube-system/csi-azuredisk-node-m6gck, kube-system/csi-azurefile-node-pb7r8, kube-system/kube-proxy-nwrmz, monitoring/kube-prometheus-stack-prometheus-node-exporter-kbxjp
+evicting pod kube-system/metrics-server-699498b485-dpd8m
+evicting pod tigera-operator/tigera-operator-7f758f678f-j6crd
+evicting pod monitoring/alertmanager-kube-prometheus-stack-alertmanager-0
+evicting pod monitoring/kube-prometheus-stack-grafana-6c6b4dd4fd-j4fxg
+evicting pod kube-system/coredns-5d474ff6db-zrrk7
+evicting pod monitoring/kube-prometheus-stack-kube-state-metrics-5dbc674cc4-kgvqv
+evicting pod calico-system/calico-kube-controllers-57f56fdf4b-6474x
+evicting pod monitoring/kube-prometheus-stack-operator-54f569694f-28g6b
+evicting pod keda/keda-operator-metrics-apiserver-59f87ff8c4-p75q4
+evicting pod helios-prod/orion-api-55995c4f-cnvvw
+evicting pod kube-system/konnectivity-agent-75b8b9c8cf-xdw6t
+evicting pod monitoring/prometheus-kube-prometheus-stack-prometheus-0
+evicting pod helios-prod/orion-scheduler-7c6b995f6-nl8db
+evicting pod keda/keda-admission-webhooks-6c86554598-mrt2l
+evicting pod kube-system/coredns-autoscaler-6769f8f9b-n7hkd
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-6p5tj
+evicting pod kube-system/konnectivity-agent-75b8b9c8cf-r96wt
+evicting pod keda/keda-operator-755db47fb9-8rlmj
+evicting pod kube-system/ama-logs-rs-755ffcfc97-x8fk8
+evicting pod kube-system/coredns-5d474ff6db-vzs2q
+evicting pod kube-system/metrics-server-699498b485-8spzs
+evicting pod calico-system/calico-typha-7c974c445b-55s55
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+evicting pod kube-system/konnectivity-agent-autoscaler-7c54b597d4-r9jkz
+I0916 18:29:18.853477    6012 request.go:752] "Waited before sending request" delay="1.0000817s" reason="client-side throttling, not priority and fairness" verb="POST" URL="https://helios-shared-yhac9m24.hcp.centralindia.azmk8s.io:443/api/v1/namespaces/kube-system/pods/coredns-autoscaler-6769f8f9b-n7hkd/eviction"
+error when evicting pods/"konnectivity-agent-75b8b9c8cf-r96wt" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+error when evicting pods/"coredns-5d474ff6db-vzs2q" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/kube-prometheus-stack-kube-state-metrics-5dbc674cc4-kgvqv evicted
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/calico-kube-controllers-57f56fdf4b-6474x evicted
+pod/tigera-operator-7f758f678f-j6crd evicted
+pod/keda-operator-metrics-apiserver-59f87ff8c4-p75q4 evicted
+pod/kube-prometheus-stack-grafana-6c6b4dd4fd-j4fxg evicted
+pod/metrics-server-699498b485-dpd8m evicted
+pod/alertmanager-kube-prometheus-stack-alertmanager-0 evicted
+pod/kube-prometheus-stack-operator-54f569694f-28g6b evicted
+pod/konnectivity-agent-autoscaler-7c54b597d4-r9jkz evicted
+pod/orion-api-55995c4f-cnvvw evicted
+pod/prometheus-kube-prometheus-stack-prometheus-0 evicted
+pod/coredns-autoscaler-6769f8f9b-n7hkd evicted
+pod/azure-wi-webhook-controller-manager-875646695-6p5tj evicted
+pod/orion-scheduler-7c6b995f6-nl8db evicted
+pod/keda-operator-755db47fb9-8rlmj evicted
+pod/keda-admission-webhooks-6c86554598-mrt2l evicted
+pod/ama-logs-rs-755ffcfc97-x8fk8 evicted
+pod/coredns-5d474ff6db-zrrk7 evicted
+evicting pod kube-system/coredns-5d474ff6db-vzs2q
+evicting pod kube-system/konnectivity-agent-75b8b9c8cf-r96wt
+error when evicting pods/"coredns-5d474ff6db-vzs2q" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+error when evicting pods/"konnectivity-agent-75b8b9c8cf-r96wt" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/calico-typha-7c974c445b-55s55 evicted
+evicting pod kube-system/coredns-5d474ff6db-vzs2q
+evicting pod kube-system/konnectivity-agent-75b8b9c8cf-r96wt
+error when evicting pods/"coredns-5d474ff6db-vzs2q" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+error when evicting pods/"konnectivity-agent-75b8b9c8cf-r96wt" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/coredns-5d474ff6db-vzs2q
+evicting pod kube-system/konnectivity-agent-75b8b9c8cf-r96wt
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/coredns-5d474ff6db-vzs2q evicted
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/konnectivity-agent-75b8b9c8cf-xdw6t evicted
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+pod/konnectivity-agent-75b8b9c8cf-r96wt evicted
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+error when evicting pods/"azure-wi-webhook-controller-manager-875646695-pjwng" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/azure-wi-webhook-controller-manager-875646695-pjwng
+pod/azure-wi-webhook-controller-manager-875646695-pjwng evicted
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+error when evicting pods/"metrics-server-699498b485-8spzs" -n "kube-system" (will retry after 5s): Cannot evict pod as it would violate the pod's disruption budget.
+evicting pod kube-system/metrics-server-699498b485-8spzs
+pod/metrics-server-699498b485-8spzs evicted
+node/aks-system-30472714-vmss000000 drained

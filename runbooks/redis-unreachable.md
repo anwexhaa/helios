@@ -4,7 +4,7 @@ The service cannot reach its only stateful dependency.
 
 **Severity:** page
 **Alerts:** `OrionRedisUnreachable`
-**Last exercised:** not yet - Phase 4 game day
+**Last exercised:** 2026-09-16, game day 2 - Redis recovered in ~11s; the alert reached pending and correctly did not page. See [gamedays.md](../docs/gamedays.md#experiment-2--redis-killed).
 
 ## Symptom
 

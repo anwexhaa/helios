@@ -35,11 +35,21 @@ spec:
   # two-node total.
   maxReplicaCount: 12
 
-  pollingInterval: 15
-  # Two minutes before scaling back to minReplicaCount. Long enough that a gap
-  # between bursts does not cause a scale-down immediately followed by a
-  # scale-up, which costs more in pod startup than the idle capacity saved.
-  cooldownPeriod: 120
+  # pollingInterval and cooldownPeriod are deliberately NOT set.
+  #
+  # An earlier version set both, with a comment claiming cooldownPeriod gave
+  # "two minutes before scaling back to minReplicaCount". KEDA rejected that
+  # reading on apply:
+  #
+  #   Warning: CooldownPeriod is configured but is not relevant. CooldownPeriod
+  #   is only relevant when minReplicaCount = 0 or idleReplicaCount = 0
+  #
+  # Both fields only govern the 0 <-> 1 activation that KEDA performs itself.
+  # With minReplicaCount at 1 there is no activation step: KEDA publishes the
+  # metric and the HPA it creates does all the scaling. Scale-down timing is
+  # therefore controlled by the behavior block below, not here - and it was
+  # the behavior block's 180-second window that was doing the real work all
+  # along. The setting that looked responsible was a no-op.
 
   advanced:
     horizontalPodAutoscalerConfig:

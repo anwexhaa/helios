@@ -1,0 +1,65 @@
+before injection:
+  t+   0s  latency_good_5m=0.896   error_ratio_5m=0.000   submit_p95_s=0.005   pods_not_ready=0
+
+injecting 500ms Redis latency at 12:50:19Z (duration 5m)
+  t+   1s  latency_good_5m=0.896   error_ratio_5m=0.000   submit_p95_s=0.005   pods_not_ready=0
+  t+  33s  latency_good_5m=0.486   error_ratio_5m=0.000   submit_p95_s=2.228   pods_not_ready=2
+  t+  65s  latency_good_5m=0.111   error_ratio_5m=0.000   submit_p95_s=2.307   pods_not_ready=1
+  t+  97s  latency_good_5m=0.040   error_ratio_5m=0.000   submit_p95_s=2.359   pods_not_ready=0
+  t+ 129s  latency_good_5m=0.027   error_ratio_5m=0.000   submit_p95_s=2.363   pods_not_ready=2
+  t+ 161s  latency_good_5m=0.022   error_ratio_5m=0.000   submit_p95_s=2.359   pods_not_ready=2
+  t+ 193s  latency_good_5m=0.018   error_ratio_5m=0.000   submit_p95_s=2.359   pods_not_ready=2
+  t+ 224s  latency_good_5m=0.016   error_ratio_5m=0.000   submit_p95_s=2.355   pods_not_ready=1
+  t+ 256s  latency_good_5m=0.014   error_ratio_5m=0.000   submit_p95_s=2.358   pods_not_ready=1
+  t+ 288s  latency_good_5m=0.008   error_ratio_5m=0.000   submit_p95_s=2.360   pods_not_ready=2
+  t+ 321s  latency_good_5m=0.000   error_ratio_5m=0.000   submit_p95_s=2.362   pods_not_ready=0
+  t+ 353s  latency_good_5m=0.055   error_ratio_5m=0.000   submit_p95_s=2.291   pods_not_ready=0
+  t+ 385s  latency_good_5m=0.137   error_ratio_5m=0.000   submit_p95_s=2.210   pods_not_ready=0
+  t+ 417s  latency_good_5m=0.153   error_ratio_5m=0.000   submit_p95_s=0.705   pods_not_ready=0
+  t+ 448s  latency_good_5m=0.205   error_ratio_5m=0.000   submit_p95_s=nan     pods_not_ready=1
+
+chaos status:
+  phase=Stop
+
+alert state for the latency objective:
+   ['firing']
+
+==========================================================================
+ANALYSIS
+==========================================================================
+
+Client side (k6, 5/s through port-forward): 1792 submitted, 8 rejected,
+http failures 0.44%, submit p95 1484ms, p99 1665ms. Normal is 5-9ms.
+
+The server-side submit_p95 of ~2.36s above is a bucket-interpolation
+artifact, not a measurement. orion_http_request_duration_seconds reuses
+DISPATCH_BUCKETS, which step from 1.0 straight to 2.5, so any latency in
+that range is linearly smeared across the gap. k6 timed each request
+directly; 1.48s is the real p95.
+
+Hypothesis: availability holds, latency objective collapses, every probe
+stays green.
+
+  availability holds              CONFIRMED  error_ratio_5m 0.000 throughout
+  latency objective collapses     CONFIRMED  latency_good_5m 0.896 -> 0.000
+  latency alert fires             CONFIRMED  reached firing - but its 1h window
+                                             also contains the load test's
+                                             queue-wait breach, so this cannot
+                                             be attributed to exp 3 alone
+  every probe stays green         FALSIFIED  workers and scheduler flapped
+                                             NotReady throughout
+
+Why the probes failed: worker and scheduler /ready made two Redis round
+trips (ping + queue-depth read) on the main 5s client. At +500ms each that
+is ~1s - the kubelet's default probe timeout. The API survived because its
+/ready had already been changed to a single call on a 1s client.
+
+No user impact here, because workers have no Service: a NotReady worker
+keeps pulling jobs. The same flaw on the API would have removed every
+replica from the Service simultaneously, over latency the pods could still
+have served through - turning a slow dependency into a full outage.
+
+Fixed in code: readiness is now one ping on a fast client, and the
+queue-depth read is gone from the health path entirely.
+
+NetworkChaos auto-reverted at the end of its 5m duration (phase=Stop).
