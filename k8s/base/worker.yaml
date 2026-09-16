@@ -6,8 +6,16 @@ metadata:
     app.kubernetes.io/name: orion-worker
     app.kubernetes.io/component: worker
 spec:
-  # KEDA owns this number from Phase 4 onward. It is the floor, not the target.
-  replicas: 1
+  # replicas is deliberately ABSENT.
+  #
+  # In production KEDA owns this field. `kubectl apply` leaves a field alone
+  # when it is neither in the manifest nor in last-applied-configuration, so
+  # omitting it lets the autoscaler keep its value across deploys. Setting it
+  # here would reset the pool on every apply and then let KEDA scale it back
+  # up - visible as a scale-down mid-burst for no reason.
+  #
+  # Kubernetes defaults it to 1 on create. The dev and test overlays set it
+  # explicitly, because neither runs KEDA.
   selector:
     matchLabels:
       app.kubernetes.io/name: orion-worker

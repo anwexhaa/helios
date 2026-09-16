@@ -1,0 +1,63 @@
+# Horizontal autoscaling for the API. Production only.
+#
+# This one DOES scale on CPU, which looks like a contradiction of D5 — that
+# decision says CPU is the wrong signal and the worker must scale on queue
+# depth instead. Both are right, because the two components fail differently.
+#
+# A worker spends most of its time blocked on Redis and on whatever the task
+# does. Its CPU stays low while the backlog grows, so CPU-based scaling reacts
+# late or never. Queue depth is what correlates with user-visible delay there.
+#
+# The API is request-driven and does its work in-process: parse, serialise,
+# one Redis round trip, respond. CPU does track offered load, and the thing
+# that degrades under load is request latency, which CPU predicts reasonably
+# well.
+#
+# Request-rate scaling would be marginally better, but it needs a custom
+# metrics adapter — a second controller to install, understand and keep alive.
+# That is not worth it for a component whose real constraint is a 4 vCPU
+# quota. The honest reason is cost, and it is written down rather than
+# dressed up.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orion-api
+  namespace: helios-prod
+  labels:
+    app.kubernetes.io/part-of: helios
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orion-api
+
+  minReplicas: 2
+  # 4 is the ceiling because the PodDisruptionBudget wants at least one
+  # available and the cluster has room for the workers to matter more. The API
+  # is not the bottleneck on this workload; the workers are.
+  maxReplicas: 4
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # 70% of the 50m request. Deliberately below 100% so there is
+          # headroom to absorb a burst while new pods start, rather than
+          # scaling only once requests are already queueing.
+          averageUtilization: 70
+
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30

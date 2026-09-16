@@ -201,3 +201,53 @@ appear at apply time as a capacity error rather than anything obviously zone-rel
 restriction *type* rather than assuming the region was unavailable. The distinction between a
 Zone restriction and a Location restriction is the difference between changing one variable and
 moving the whole build to another region.
+
+---
+
+## D10 — KEDA reads the application, not Prometheus
+
+**Decision.** The worker ScaledObject uses the `metrics-api` scaler against the service's own
+`/stats` endpoint. It does not use the `prometheus` scaler, even though Phase 3 now makes that
+possible.
+
+**Why.** D6 ruled out the `redis` scaler because the queue is a sorted set and that scaler reads
+`LLEN`. It then said to prefer the `prometheus` scaler once Phase 3 existed, on the grounds that
+scaling on the same number the SLO dashboard shows is tidier.
+
+That reasoning was about neatness, and it is wrong on reliability grounds. The `prometheus`
+scaler makes worker scaling depend on the monitoring stack being healthy. If Prometheus falls
+over while the queue is backing up — and Prometheus is the component most likely to be evicted
+under memory pressure on a two-node cluster — scaling stops at exactly the moment it is needed,
+and the queue grows unattended.
+
+**The principle.** A control loop should not depend on the observability stack. Monitoring
+watches the system; it should not be load-bearing *inside* it. `/stats` is served by the API
+itself: if that is down, scaling workers would not have helped anyway.
+
+**Trade-off.** Scaling now reads a number that does not pass through Prometheus, so a
+discrepancy between the dashboard and the scaler's view is possible. Both ultimately read
+`ZCARD` on the same key, so a divergence means one of them is stale rather than wrong.
+
+**Supersedes.** D6's preference for the `prometheus` scaler. The rejection of the `redis` scaler
+still stands.
+
+---
+
+## D11 — The API scales on CPU and the workers do not
+
+**Decision.** `orion-worker` scales on queue depth (D5). `orion-api` scales on CPU utilisation.
+
+**Why.** This looks like a contradiction and is not: the two components degrade differently.
+
+A worker spends nearly all its time blocked — on Redis, and on whatever the task does. Its CPU
+stays low while the backlog grows, so CPU-based scaling reacts late or never. Queue depth is the
+signal that correlates with user-visible delay.
+
+The API is request-driven and does its work in-process: parse, serialise, one Redis round trip,
+respond. CPU does track offered load there, and the thing that degrades is request latency,
+which CPU predicts reasonably.
+
+**Trade-off.** Scaling the API on request rate would be marginally better, but it needs a custom
+metrics adapter — another controller to install, understand and keep running — for a component
+that is not the bottleneck on this workload. The honest reason is cost, recorded rather than
+dressed up.

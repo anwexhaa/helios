@@ -17,7 +17,7 @@ The platform is the project.
 | 1 | Cluster and infrastructure as code | Terraform and manifests written, not yet applied |
 | 2 | Multi-environment delivery pipeline | Pipeline and smoke test written; never run |
 | 3 | Observability, SLOs and alerting | Written and validated; not yet installed |
-| 4 | Autoscaling, chaos and incident response | Not started |
+| 4 | Autoscaling, chaos and incident response | Written and validated; game days not yet run |
 
 ## Layout
 
@@ -26,7 +26,8 @@ infra/       Terraform — the entire Azure environment (Phase 1)
 k8s/         Kubernetes manifests; base plus one overlay per environment
 pipelines/   Azure DevOps multi-stage pipeline definitions (Phase 2)
 scripts/     preflight, smoke tests, load generation
-runbooks/    One page per failure mode (Phase 4)
+runbooks/    One page per failure mode
+chaos/       Chaos experiments, one hypothesis each
 docs/        SLO definitions, alerting policy, game days, postmortems
 docs/kql/    Saved Log Analytics triage queries (Phase 3)
 ```

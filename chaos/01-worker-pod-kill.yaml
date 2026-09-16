@@ -1,0 +1,28 @@
+# Experiment 1 - kill one worker pod.
+#
+# Hypothesis: a worker dying mid-job costs nothing user-visible. The pod is
+# replaced by the Deployment, and the job it was holding is either finished
+# during the SIGTERM drain or left on the queue for another worker.
+#
+# What would falsify it: jobs disappearing, dispatch latency spiking beyond
+# 300ms for longer than the replacement takes, or the error budget moving.
+#
+#   kubectl apply -f chaos/01-worker-pod-kill.yaml
+#   kubectl -n helios-prod get pods -l app.kubernetes.io/name=orion-worker -w
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: worker-pod-kill
+  namespace: helios-prod
+  labels:
+    app.kubernetes.io/part-of: helios
+spec:
+  action: pod-kill
+  # One pod, not all. The question is whether losing a member of the pool
+  # matters; killing the whole pool asks a different and less useful question.
+  mode: one
+  selector:
+    namespaces:
+      - helios-prod
+    labelSelectors:
+      app.kubernetes.io/name: orion-worker

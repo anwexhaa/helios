@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 TF := terraform -chdir=infra
 
-.PHONY: help preflight bootstrap init fmt validate plan up down creds namespaces deploy smoke check-rules monitoring grafana cost
+.PHONY: help preflight bootstrap init fmt validate plan up down creds namespaces deploy smoke check-rules monitoring grafana keda chaos-install chaos-clean loadtest scale-watch cost
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -63,6 +63,26 @@ monitoring: ## Install kube-prometheus-stack and apply the SLO rules and dashboa
 
 grafana: ## Port-forward Grafana to localhost:3000
 	@kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+
+keda: ## Install KEDA into the cluster
+	@helm repo add kedacore https://kedacore.github.io/charts >/dev/null
+	@helm repo update >/dev/null
+	@helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --wait
+
+chaos-install: ## Install Chaos Mesh. containerd runtime is required on AKS.
+	@helm repo add chaos-mesh https://charts.chaos-mesh.org >/dev/null
+	@helm repo update >/dev/null
+	@helm upgrade --install chaos-mesh chaos-mesh/chaos-mesh 	  --namespace chaos-testing --create-namespace 	  --set chaosDaemon.runtime=containerd 	  --set chaosDaemon.socketPath=/run/containerd/containerd.sock --wait
+
+chaos-clean: ## Remove every running chaos experiment
+	@kubectl -n helios-prod delete podchaos --all --ignore-not-found
+	@kubectl -n helios-prod delete networkchaos --all --ignore-not-found
+
+loadtest: ## Drive load at the queue: make loadtest RATE=25 DURATION=3m
+	@cd scripts/loadtest && k6 run 	  -e BASE_URL=$(or $(BASE_URL),http://localhost:18080) 	  -e RATE=$(or $(RATE),25) 	  -e DURATION=$(or $(DURATION),3m) submit.js
+
+scale-watch: ## Watch the autoscalers react
+	@kubectl -n helios-prod get scaledobject,hpa,pods -w
 
 cost: ## Rough daily cost of what is currently running
 	@echo "Node pool:       ~rs 85/day per Standard_B2s_v2 node"

@@ -1,0 +1,28 @@
+# Experiment 2 - kill Redis outright.
+#
+# Hypothesis: the service degrades cleanly rather than hanging. /submit returns
+# 500 in roughly 8 seconds, /ready goes 503 and pods leave the Service,
+# /health stays 200 so nothing is restarted unnecessarily, and orion_redis_up
+# drops to 0 within the alert's 2-minute window.
+#
+# Those timings are not aspirational: they were measured after bounding the
+# redis-py retry policy. Before that fix /submit took 48 seconds, which is the
+# failure mode this experiment is really checking has not come back.
+#
+# Expect queued jobs to be LOST. Redis here is deliberately ephemeral - see
+# the note in runbooks/redis-unreachable.md.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: redis-pod-kill
+  namespace: helios-prod
+  labels:
+    app.kubernetes.io/part-of: helios
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - helios-prod
+    labelSelectors:
+      app.kubernetes.io/name: redis

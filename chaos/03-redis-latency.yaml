@@ -1,0 +1,37 @@
+# Experiment 3 - add 500ms to every Redis round trip.
+#
+# The most interesting of the four, because it is the one where nothing
+# crashes. Every pod stays Ready, every probe stays green, and the service
+# quietly stops meeting its latency objective.
+#
+# Hypothesis: dispatch latency breaches 300ms almost immediately and
+# OrionDispatchLatencyObjectiveAtRisk fires within ~10 minutes, while
+# availability stays intact because requests still succeed.
+#
+# This is what a latency SLO is for. A liveness-and-restarts view of the world
+# sees a perfectly healthy service here.
+#
+# Bounded by `duration` so it reverts on its own if the game day is abandoned.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: redis-latency
+  namespace: helios-prod
+  labels:
+    app.kubernetes.io/part-of: helios
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - helios-prod
+    labelSelectors:
+      app.kubernetes.io/name: redis
+  delay:
+    latency: "500ms"
+    jitter: "50ms"
+    # Some correlation, so it behaves like a degraded network rather than a
+    # uniform random delay - real latency is bursty.
+    correlation: "50"
+  direction: to
+  duration: "5m"

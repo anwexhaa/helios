@@ -5,11 +5,15 @@ namespace: helios-prod
 
 resources:
   - ../../base
+  - scaledobject.yaml
+  - hpa-api.yaml
 
+# orion-worker is deliberately absent. KEDA owns its replica count, and
+# listing it here would make every `kubectl apply -k` reset the deployment to
+# a fixed number - scaling the pool down mid-burst, then letting KEDA scale it
+# back up. Two controllers writing the same field is a fight, not a config.
 replicas:
   - name: orion-api
-    count: 2
-  - name: orion-worker
     count: 2
 
 patches:
