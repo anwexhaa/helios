@@ -110,3 +110,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "alert_email" {
+  description = "Address the Azure Monitor action group delivers to. Platform alerts only; service alerts go through Alertmanager."
+  type        = string
+  default     = "anwesha.das2409@gmail.com"
+
+  validation {
+    condition     = can(regex("^[^@ ]+@[^@ ]+[.][^@ ]+$", var.alert_email))
+    error_message = "alert_email must be a valid email address."
+  }
+}

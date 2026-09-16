@@ -1,0 +1,44 @@
+# Scrape all three Orion roles.
+#
+# A PodMonitor rather than a ServiceMonitor, because only the API has a
+# Service. The worker and scheduler expose /metrics on their own tiny HTTP
+# server and are not reachable through any Service - and they are the two that
+# hold the queue depth and worker liveness signals.
+#
+# Scraping through a Service would also be wrong even where one exists: it
+# load balances, so a scrape would hit one random replica and the others would
+# never be measured.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: orion
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: helios
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - helios-dev
+      - helios-test
+      - helios-prod
+  selector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, worker, scheduler]
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      # Below the 10s default, because a degraded Redis can slow the scrape.
+      # The metrics path uses a one-second Redis client precisely so this
+      # budget is never the thing that breaks, but the margin is deliberate.
+      scrapeTimeout: 10s
+      relabelings:
+        # Keep the component as a label so the dashboard can split api from
+        # worker without matching on pod name prefixes.
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+          targetLabel: component
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod

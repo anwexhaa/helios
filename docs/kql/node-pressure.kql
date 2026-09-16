@@ -1,0 +1,11 @@
+// Node conditions over the last six hours.
+//
+// This is the question Prometheus cannot answer, because Prometheus is running
+// on the node in question. When the cluster itself is unhealthy, Azure Monitor
+// is the view that still works.
+KubeNodeInventory
+| where TimeGenerated > ago(6h)
+| summarize arg_max(TimeGenerated, Status, KubeletVersion) by Computer
+| extend Healthy = Status has "Ready" and not(Status has "Pressure")
+| project Computer, Status, KubeletVersion, Healthy, LastSeen = TimeGenerated
+| order by Healthy asc, Computer asc

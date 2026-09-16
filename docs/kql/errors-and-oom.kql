@@ -1,0 +1,16 @@
+// Anything that looks like a failure across all Orion pods.
+//
+// Deliberately broad. During an incident, the cost of reading a few irrelevant
+// lines is far lower than the cost of missing the one that mattered because
+// the filter was too clever.
+let window = 1h;
+ContainerLogV2
+| where TimeGenerated > ago(window)
+| where PodNamespace startswith "helios-"
+| where LogMessage has_any (
+    "Traceback", "ConnectionError", "TimeoutError",
+    "failed", "Error", "CRITICAL", "OOM"
+  )
+| project TimeGenerated, PodNamespace, PodName, LogMessage
+| order by TimeGenerated desc
+| take 200

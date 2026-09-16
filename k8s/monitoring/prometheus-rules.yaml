@@ -1,0 +1,202 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: orion-slo
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: helios
+    # kube-prometheus-stack only picks up rules carrying its release label.
+    release: kube-prometheus-stack
+spec:
+  groups:
+    # ---------------------------------------------------------------------
+    # Recording rules.
+    #
+    # The alerts below could inline these expressions, but recording them has
+    # two payoffs: the dashboard and the alerts read the same number, so they
+    # can never disagree, and the SLI definition lives in exactly one place.
+    # Change the definition here and everything downstream follows.
+    # ---------------------------------------------------------------------
+    - name: orion-slo-availability
+      interval: 30s
+      rules:
+        - record: job:slo_errors:ratio_rate5m
+          expr: |
+            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[5m]))
+              /
+            sum(rate(orion_http_requests_total{namespace="helios-prod"}[5m]))
+
+        - record: job:slo_errors:ratio_rate30m
+          expr: |
+            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[30m]))
+              /
+            sum(rate(orion_http_requests_total{namespace="helios-prod"}[30m]))
+
+        - record: job:slo_errors:ratio_rate1h
+          expr: |
+            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[1h]))
+              /
+            sum(rate(orion_http_requests_total{namespace="helios-prod"}[1h]))
+
+        - record: job:slo_errors:ratio_rate6h
+          expr: |
+            sum(rate(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[6h]))
+              /
+            sum(rate(orion_http_requests_total{namespace="helios-prod"}[6h]))
+
+        # Share of the 28-day error budget still unspent, as a fraction.
+        # Negative means the objective has already been missed for the window.
+        - record: job:slo_error_budget_remaining:ratio
+          expr: |
+            1 - (
+              sum(increase(orion_http_requests_total{namespace="helios-prod",status=~"5.."}[28d]))
+                /
+              sum(increase(orion_http_requests_total{namespace="helios-prod"}[28d]))
+            ) / 0.005
+
+    - name: orion-slo-latency
+      interval: 30s
+      rules:
+        # Fraction of jobs dispatched within 300ms. le="0.3" must exist as a
+        # bucket boundary or this is an interpolation, not a measurement.
+        - record: job:slo_latency_good:ratio_rate5m
+          expr: |
+            sum(rate(orion_dispatch_latency_seconds_bucket{namespace="helios-prod",le="0.3"}[5m]))
+              /
+            sum(rate(orion_dispatch_latency_seconds_count{namespace="helios-prod"}[5m]))
+
+        - record: job:slo_latency_good:ratio_rate1h
+          expr: |
+            sum(rate(orion_dispatch_latency_seconds_bucket{namespace="helios-prod",le="0.3"}[1h]))
+              /
+            sum(rate(orion_dispatch_latency_seconds_count{namespace="helios-prod"}[1h]))
+
+    # ---------------------------------------------------------------------
+    # Alerts.
+    #
+    # Thresholds are burn_rate x (1 - SLO). With a 99.5% objective the budget
+    # fraction is 0.005, so a 13.44x burn is a 6.72% error ratio.
+    #
+    # Every threshold here derives from that objective. Change the objective
+    # in docs/slo.md and these numbers must change with it - there is no way
+    # to make that automatic in Prometheus, so it is written down instead.
+    # ---------------------------------------------------------------------
+    - name: orion-slo-alerts
+      rules:
+        - alert: OrionErrorBudgetFastBurn
+          # 2% of the 28-day budget in one hour.
+          # Both windows must be burning: the 1h window means it is real, the
+          # 5m window means the alert stops when the incident does.
+          expr: |
+            job:slo_errors:ratio_rate1h > (13.44 * 0.005)
+            and
+            job:slo_errors:ratio_rate5m > (13.44 * 0.005)
+          for: 2m
+          labels:
+            severity: page
+            slo: availability
+          annotations:
+            summary: "Orion is burning its error budget 13x too fast"
+            description: >-
+              The 1h error ratio is {{ $value | humanizePercentage }}, against a
+              6.72% threshold. At this rate the entire 28-day budget is gone in
+              about two days.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/error-budget-burn.md"
+
+        - alert: OrionErrorBudgetSlowBurn
+          # 5% of the budget in six hours. A ticket, not a phone call.
+          expr: |
+            job:slo_errors:ratio_rate6h > (5.6 * 0.005)
+            and
+            job:slo_errors:ratio_rate30m > (5.6 * 0.005)
+          for: 15m
+          labels:
+            severity: ticket
+            slo: availability
+          annotations:
+            summary: "Orion is burning its error budget faster than sustainable"
+            description: >-
+              The 6h error ratio is {{ $value | humanizePercentage }}, against a
+              2.8% threshold. Not urgent, but it will not hold for a month.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/error-budget-burn.md"
+
+        - alert: OrionDispatchLatencyObjectiveAtRisk
+          # Target is 95% within 300ms, so fire below 0.95.
+          expr: job:slo_latency_good:ratio_rate1h < 0.95
+          for: 10m
+          labels:
+            severity: ticket
+            slo: latency
+          annotations:
+            summary: "Jobs are waiting too long to be picked up"
+            description: >-
+              Only {{ $value | humanizePercentage }} of jobs were dispatched
+              within 300ms over the last hour, against a 95% objective. Usually
+              too few workers for the offered load.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/dispatch-latency.md"
+
+    # ---------------------------------------------------------------------
+    # Symptom alerts that are not SLO burn.
+    #
+    # Each one describes something a user would notice. None of them alert on
+    # CPU, memory, or restart counts - see docs/alerting.md for why.
+    # ---------------------------------------------------------------------
+    - name: orion-symptoms
+      rules:
+        - alert: OrionQueueStalled
+          # Work is waiting and nothing is completing. This is the failure the
+          # smoke test exists to catch: every probe green, nothing processed.
+          expr: |
+            orion_queue_depth{namespace="helios-prod"} > 0
+            and
+            sum(rate(orion_jobs_processed_total{namespace="helios-prod"}[5m])) == 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "Jobs are queued but none are completing"
+            description: >-
+              Queue depth is {{ $value }} and no job has reached a terminal
+              state in five minutes. The API is likely healthy and accepting
+              work that nothing is consuming.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/queue-stalled.md"
+
+        - alert: OrionRedisUnreachable
+          # Reported by the service itself, so it covers network partition and
+          # auth failure, not just Redis being down.
+          expr: min(orion_redis_up{namespace="helios-prod"}) == 0
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: "Orion cannot reach Redis"
+            description: >-
+              At least one pod's last Redis round-trip failed. Submissions will
+              return 500 and the queue will not drain.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/redis-unreachable.md"
+
+        - alert: OrionNoWorkersRunning
+          expr: sum(orion_workers_alive{namespace="helios-prod"}) == 0
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: "No Orion workers are running"
+            description: >-
+              Nothing is consuming the queue. Submitted work will sit
+              indefinitely regardless of what the API reports.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/queue-stalled.md"
+
+        - alert: OrionDeadLetterGrowing
+          # Not a page. Jobs reaching the dead letter queue means the retry
+          # path worked and gave up, which is the design functioning - but a
+          # sustained rise means something upstream is broken.
+          expr: increase(orion_dead_letter_depth{namespace="helios-prod"}[1h]) > 10
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: "Dead letter queue is growing"
+            description: >-
+              More than 10 jobs exhausted their retries in the last hour.
+              Inspect them before they are pruned.

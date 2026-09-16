@@ -1,0 +1,157 @@
+# Helm values for kube-prometheus-stack.
+#
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm upgrade --install kube-prometheus-stack \
+#     prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace \
+#     --values k8s/monitoring/values-kube-prometheus-stack.yaml
+#
+# The release name must stay `kube-prometheus-stack`: the PrometheusRule and
+# PodMonitor carry `release: kube-prometheus-stack`, which is how the operator
+# decides whether to pick them up. Rename the release and every rule silently
+# stops being loaded — no error, just an empty rules page.
+#
+# Sized for the real cluster, not the chart defaults. Two Standard_B2s_v2
+# nodes give 1900m allocatable each, and the application already requests
+# 220m. The stock chart asks for considerably more than what is left and the
+# pods would sit Pending, which looks like a broken install rather than a
+# capacity problem.
+
+# --- Components AKS does not expose -----------------------------------------
+#
+# The control plane is managed, so there is nothing to scrape on these ports.
+# Left enabled they become permanently-down targets, and a monitoring system
+# that always shows red teaches people to ignore red.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+# --- Prometheus --------------------------------------------------------------
+prometheus:
+  prometheusSpec:
+    # The cluster is destroyed nightly, so long retention buys nothing. The
+    # error budget over 28 days is computed from what is there; a fresh
+    # cluster starts a fresh window, which is honest for a build like this.
+    retention: 2d
+    retentionSize: 4GB
+
+    # emptyDir, not a PersistentVolume. A PVC survives `make down` and keeps
+    # billing, and the disk would outlive the cluster it describes.
+    storageSpec: {}
+
+    resources:
+      requests:
+        cpu: 150m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+    # Pick up PodMonitors and PrometheusRules from every namespace, not only
+    # the release namespace. Ours live in monitoring but select pods in
+    # helios-*.
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # A scrape interval that matches the rule interval. Recording rules
+    # evaluating faster than the data arrives just recompute the same point.
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+# --- Alertmanager ------------------------------------------------------------
+alertmanager:
+  alertmanagerSpec:
+    storage: {}
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  config:
+    route:
+      group_by: ["alertname", "severity"]
+      group_wait: 30s
+      group_interval: 5m
+      # Twelve hours, not the four-hour default. A page that re-sends every
+      # four hours through a long incident is noise: the responder already
+      # knows.
+      repeat_interval: 12h
+      receiver: "default"
+      routes:
+        - matchers: ['severity = "page"']
+          receiver: "page"
+          repeat_interval: 1h
+        - matchers: ['severity = "ticket"']
+          receiver: "ticket"
+          repeat_interval: 24h
+
+    receivers:
+      # Deliberately empty. Delivery for this project goes through the Azure
+      # Monitor action group in infra/monitoring.tf, which already has the
+      # email address and does not put an SMTP password in a Helm value.
+      - name: "default"
+      - name: "page"
+      - name: "ticket"
+
+    inhibit_rules:
+      # If Redis is unreachable, everything downstream is failing too. Send
+      # the cause, suppress the consequences.
+      - source_matchers: ['alertname = "OrionRedisUnreachable"']
+        target_matchers: ['alertname =~ "OrionQueueStalled|OrionErrorBudget.*"']
+        equal: ["namespace"]
+
+# --- Grafana -----------------------------------------------------------------
+grafana:
+  adminPassword: ""  # set at install time with --set, never committed
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  persistence:
+    enabled: false
+
+  # Dashboards come from the repo, not from clicking in the UI. Anything drawn
+  # by hand dies with the cluster; see working rule 1 in the README.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+  defaultDashboardsTimezone: Asia/Kolkata
+
+# --- Exporters ---------------------------------------------------------------
+nodeExporter:
+  enabled: true
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

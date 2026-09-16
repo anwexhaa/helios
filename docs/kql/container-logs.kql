@@ -1,0 +1,14 @@
+// Application logs for one Orion component, oldest first.
+//
+// Replace the namespace and component before running. Keep the time range
+// tight: ContainerLogV2 is the largest table in the workspace, and the free
+// tier allows 5 GB of ingestion a month.
+let window = 30m;
+let ns = "helios-prod";
+let component = "orion-worker";   // orion-api | orion-worker | orion-scheduler
+ContainerLogV2
+| where TimeGenerated > ago(window)
+| where PodNamespace == ns
+| where PodName startswith component
+| project TimeGenerated, PodName, LogMessage
+| order by TimeGenerated asc

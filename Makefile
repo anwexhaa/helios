@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 TF := terraform -chdir=infra
 
-.PHONY: help preflight bootstrap init fmt validate plan up down creds namespaces cost
+.PHONY: help preflight bootstrap init fmt validate plan up down creds namespaces deploy smoke check-rules monitoring grafana cost
 
 help: ## Show available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -51,6 +51,18 @@ deploy: ## Deploy the app to one environment: make deploy ENV=dev
 
 smoke: ## Smoke test one environment via port-forward: make smoke ENV=dev
 	@bash -c 'kubectl -n helios-$(ENV) port-forward svc/orion-api 18080:80 >/dev/null 2>&1 & pf=$$!; sleep 5; ./scripts/smoke.sh http://localhost:18080; rc=$$?; kill $$pf 2>/dev/null; exit $$rc'
+
+check-rules: ## Validate the Prometheus rules with promtool. Needs Docker, not a cluster.
+	@./scripts/check-rules.sh
+
+monitoring: ## Install kube-prometheus-stack and apply the SLO rules and dashboard
+	@helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
+	@helm repo update >/dev/null
+	@helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \n	  --namespace monitoring --create-namespace \n	  --values k8s/monitoring/values-kube-prometheus-stack.yaml --wait
+	@kubectl apply -f k8s/monitoring/prometheus-rules.yaml \n	  -f k8s/monitoring/podmonitor.yaml \n	  -f k8s/monitoring/grafana-dashboard.yaml
+
+grafana: ## Port-forward Grafana to localhost:3000
+	@kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
 
 cost: ## Rough daily cost of what is currently running
 	@echo "Node pool:       ~rs 85/day per Standard_B2s_v2 node"

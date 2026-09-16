@@ -1,0 +1,15 @@
+// Which Orion pods restarted in the last hour, and why.
+//
+// Prometheus knows a pod restarted. Only the container status tells you the
+// reason, and OOMKilled versus Error versus CrashLoopBackOff lead to three
+// completely different investigations.
+KubePodInventory
+| where TimeGenerated > ago(1h)
+| where Namespace startswith "helios-"
+| summarize
+    Restarts = max(PodRestartCount),
+    arg_max(TimeGenerated, ContainerStatus, ContainerStatusReason)
+    by Name, Namespace
+| where Restarts > 0
+| project Namespace, Pod = Name, Restarts, ContainerStatus, ContainerStatusReason
+| order by Restarts desc
