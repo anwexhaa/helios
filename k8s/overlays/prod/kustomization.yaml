@@ -15,13 +15,20 @@ replicas:
 patches:
   # Production carries the real resource requests. The cluster autoscaler
   # reasons about requests, so these are what decide when a node is added.
+  #
+  # 150m, not 200m. The subscription is a free trial capped at 4 vCPUs, which
+  # is two Standard_B2s nodes and roughly 3 vCPU allocatable after AKS
+  # reserves its own. At 150m a KEDA ceiling of 8 workers is 1.2 vCPU - more
+  # than one node can hold, so a second node is genuinely required, and still
+  # comfortably inside two. At 200m the same demonstration would hit the
+  # quota rather than the autoscaler, and look like KEDA was broken. See D8.
   - target:
       kind: Deployment
       name: orion-worker
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: 200m
+        value: 150m
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/memory
-        value: 256Mi
+        value: 192Mi

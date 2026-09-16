@@ -130,10 +130,31 @@ This was found by querying `az vm list-usage` before the first apply rather than
 the apply fail, which is the difference between a constraint and an incident.
 
 **Consequence.** The cluster autoscaler can still be demonstrated — it scales 1 to 2 nodes, and
-the mechanism is identical. What is capped is Phase 4's headroom: KEDA scaling workers to 10
-replicas at 200m each is 2 vCPUs of requests, which fills a 2-node cluster rather than
-triggering a third node. Either scale the Phase 4 demonstration to what fits, or upgrade the
-subscription first and raise `node_max_count`.
+the mechanism is identical. Phase 4 is sized to fit rather than the subscription being upgraded;
+that choice is deliberate and final.
+
+### Phase 4 sizing, derived rather than guessed
+
+Two Standard_B2s nodes are 4 vCPUs raw, roughly 3.0 allocatable once AKS takes its reservations,
+and roughly 2.6 usable after system pods. One node alone offers about 1.1 usable.
+
+Worker CPU requests are therefore **150m in production, not 200m**, and KEDA's ceiling is
+**8 replicas**:
+
+| Workers | CPU requested | Fits on one node? |
+|---------|---------------|-------------------|
+| at rest (2) | 0.47 | yes |
+| 4 | 0.77 | yes |
+| 6 | 1.07 | marginal |
+| **8** | **1.37** | **no — a second node is required** |
+
+That is the whole point. At 8 workers the scheduler genuinely cannot place the pods on one node,
+so the cluster autoscaler has to add the second — a real demonstration rather than a staged one —
+while the total stays well inside the two-node cap.
+
+At 200m per worker the same experiment would have hit the vCPU quota instead of the autoscaler,
+and the failure would have looked like KEDA being broken rather than the subscription being
+small. Sizing to the constraint is what makes the result mean something.
 
 A second consequence worth knowing before it bites: AKS needs at least one surge node during a
 node pool upgrade, so with two nodes running at the cap, an upgrade will be refused for lack of
