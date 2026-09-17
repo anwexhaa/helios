@@ -187,6 +187,23 @@ spec:
               return 500 and the queue will not drain.
             runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/redis-unreachable.md"
 
+        - alert: OrionWorkerDiedHoldingJobs
+          # A lease expired: a worker stopped renewing the jobs it held, which
+          # in practice means the process died - killed, evicted, OOMKilled.
+          # The jobs were requeued, so nothing was lost; this is a ticket, not
+          # a page. But a dying worker deserves a look, and game day 1 found
+          # this exact event produced no signal whatsoever before leases.
+          expr: increase(orion_leases_expired_total{namespace="helios-prod"}[15m]) > 0
+          labels:
+            severity: ticket
+          annotations:
+            summary: "A worker died holding jobs; they were requeued"
+            description: >-
+              {{ $value | humanize }} job(s) had their lease expire in the last
+              15 minutes and were put back on the queue. Nothing was lost, but
+              each may have run twice, and something is killing workers.
+            runbook_url: "https://github.com/anwexhaa/helios/blob/main/runbooks/worker-died.md"
+
         - alert: OrionNoWorkersRunning
           expr: sum(orion_workers_alive{namespace="helios-prod"}) == 0
           for: 5m

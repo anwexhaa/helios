@@ -11,7 +11,7 @@ where that happened it is said.
 
 | # | Experiment | Detected | Recovered | Budget burned | Hypothesis |
 |---|-----------|----------|-----------|---------------|-----------|
-| 1 | Worker pod killed | **Not detected.** No alert, no metric moved | 15s — a queued Pending worker took the freed slot | 0 | **Falsified** — 4 jobs lost |
+| 1 | Worker pod killed | **Not detected.** No alert, no metric moved | 15s — a queued Pending worker took the freed slot | 0 | **Falsified** — 4 jobs lost. Since fixed |
 | 2 | Redis killed | `orion_redis_up` → 0 at once; alert reached *pending*, not firing | ~11s — Deployment recreated Redis | **SLI recorded 0 — a bug.** 12 after the fix | Confirmed, but exposed two SLI blind spots |
 | 3 | Redis +500ms | Latency SLI collapsed within ~30s; alert reached *firing* | Reverted at the 5m chaos duration | 0 availability; latency objective breached | Partly falsified — probes did not stay green |
 | 4 | Node drained | No user-visible failure | Drain 103s; full recovery on uncordon | 0 | Confirmed for the app; the *platform* degraded |
@@ -47,10 +47,32 @@ increments any counter — it simply stops.
 two workers already Pending; the freed CPU went to one of those, and the replacement joined the
 back of the Pending queue. "Recovered in 15s" was a queued pod becoming Ready, not a replacement.
 
-**Status: open.** The fix is a reliable-queue pattern: move a job into a per-worker processing
-set with a lease *atomically* as it is popped, acknowledge it on completion, and have the
-singleton scheduler requeue leases that expire. That survives pod death because the lease lives
-in Redis. It is how SQS visibility timeouts and Sidekiq's reliable fetch work.
+**Status: fixed; verified locally, not yet on a cluster.**
+
+orion-queue now uses **leased fetch**. One Lua script pops a job and records a lease in a
+processing set; the pool renews leases while jobs run; a reaper in the scheduler requeues any
+lease that expires. The lease lives in Redis, so it survives the pod. Delivery is now
+at-least-once — the same trade SQS visibility timeouts and Sidekiq's reliable fetch make.
+
+Verified with `scripts/crash-test.sh` in orion-queue, which reproduces this experiment without a
+cluster by SIGKILLing a 4-thread worker holding a full batch:
+
+| Code | Runs | Lost |
+|------|------|------|
+| Before | 4 | **4, every run** |
+| After | 7 | **0, every run** — exactly 4 leases reaped each time |
+
+The run against the old code is the control. A graceful SIGTERM reaped nothing, as it should:
+the worker finished and acknowledged its own jobs.
+
+Leasing initially halved benchmark throughput, because every job needed a separate ack. The
+ack now rides on the next pop in the same script, and throughput is back within noise of the
+original.
+
+The silence is fixed too: `orion_leases_expired_total` counts every recovered job, and
+`OrionWorkerDiedHoldingJobs` opens a ticket when it moves.
+
+**Still to do:** re-run this experiment on the cluster.
 
 ## Experiment 2 — Redis killed
 
@@ -248,7 +270,7 @@ service behaviour.
 
 | Finding | From | Status |
 |---------|------|--------|
-| Jobs lost when a worker pod dies | Exp 1 | **Open** — needs a reliable-queue pattern |
+| Jobs lost when a worker pod dies | Exp 1 | **Fixed** — leased fetch; verified locally, not yet on a cluster |
 | SLI blind to failures that never reach the app | Exp 2 | **Open** — needs edge or synthetic measurement |
 | System pod replicas co-located on one node | Exp 4 | **Open** — topology spread or descheduler |
 | HTTP latency histogram too coarse above 1s | Exp 3 | **Open** |

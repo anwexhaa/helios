@@ -4,7 +4,7 @@ Jobs are being accepted and none are completing.
 
 **Severity:** page
 **Alerts:** `OrionQueueStalled`, `OrionNoWorkersRunning`
-**Last exercised:** not directly. Game day 1 killed a worker without stalling the queue, and found that the dead pod's in-flight jobs were lost rather than stalled - a failure this runbook cannot detect. See [gamedays.md](../docs/gamedays.md#experiment-1--worker-pod-killed).
+**Last exercised:** not directly. Game day 1 killed a worker without stalling the queue, and found that the dead pod's in-flight jobs were lost rather than stalled. That is now fixed, and a worker dying is covered by its own alert: see [worker-died.md](worker-died.md).
 
 ## Symptom
 
